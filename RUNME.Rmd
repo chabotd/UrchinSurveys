@@ -1,0 +1,31 @@
+---
+title: "RUN_ME"
+author: "Delaney Chabot"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+Load libraries
+```{r}
+library(tidyverse)
+```
+
+Run data cleaning
+
+```{r}
+source(.../data_prep.R)
+```
+
+Run analysis
+
+```{r}
+
+```
+
+Plot results
+
+```{r}
+
+```
+
+
