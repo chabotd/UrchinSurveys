@@ -6,7 +6,7 @@ This main directory contains files associated with urchin survey. Please use the
 
 ## Subdirectories
 
-**Data** - raw and cleaned data files
+[**Data**](Data/) - raw and cleaned data files
 
 **Code** - code for curating raw data
 
