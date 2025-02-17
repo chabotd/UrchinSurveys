@@ -1,0 +1,80 @@
+---
+title: "UrchinSurveyMap"
+author: "Delaney Chabot"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Load packages
+```{r}
+library(ggplot2)
+library(ggmap)
+library(maps)
+library(mapdata)
+library(ggrepel)
+library(readxl)
+library(tidyverse)
+```
+
+**THIS IS FROM ANOTHER PROJECT AND NEEDS TO BE ADJUSTED TO THE urchin survey SITES**
+Import Data
+```{r}
+#Map of Sites----
+SiteList <- read.csv("~/GitHub/MobilePredsPaper/SiteList_STARS_2024-03-20_SAG.xlsx")
+
+#View(SiteList)
+
+
+long <- SiteList$Longitude
+lat <- SiteList$Latitude
+Site <-SiteList$Site
+Reg <-SiteList$Region
+Reg<-factor(Reg, levels=c('Cape Foulweather','Cape Perpetua','Cape Arago','Cape Blanco', "Southern Oregon', 'Cape Mendocino"))#change Pred to a factor and make order for graphing and such
+
+SiteCode <-SiteList$SiteCode_STARS
+```
+
+Make Basemap
+```{r}
+states <- map_data("state")
+states <- states %>%
+  subset(region %in% c("california", "oregon"))
+```
+
+Map
+```{r}
+#map it
+map <-ggplot(data = SiteList, 
+             aes(x=long, 
+                 y = lat, color = Reg)) +   
+  geom_text_repel(aes( label = SiteCode),
+                  direction = "y", 
+                   nudge_x = -125, 
+                   min.segment.length = 0, 
+                   seed = 42, 
+                   box.padding = 0.5,
+                  size=3)+
+  geom_polygon(data = states, color = "black", fill = "white", aes(group=group)) + 
+  geom_point(size = 2, shape = 16) +
+  scale_color_manual(values= c("#577590","#90be6d","#f8961e", "#f94144")) +
+  coord_fixed(1.3) +
+  theme_classic()+
+  labs(x="Longitude", y = "Latitude") +
+  scale_x_continuous(breaks = seq(-126,-116,2)) +
+  scale_y_continuous(breaks = seq(31,47,1)) +
+  coord_map(xlim = c(-126,-116), ylim = c(31,47))+
+  theme(legend.position = "none") 
+  
+
+plot(map)
+#ggsave("Map.png", width = 4, height = 6)
+#ggsave("Map.eps", width = 4, height = 6)
+#Don't overwrite these, I edited in illustrator
+```
+
+
+
