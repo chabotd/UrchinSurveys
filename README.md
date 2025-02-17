@@ -8,13 +8,13 @@ This main directory contains files associated with urchin survey. Please use the
 
 [**Data**](Data/) - raw and cleaned data files
 
-**Code** - code for curating raw data
+[**Code**](Code/)- code for curating raw data
 
-**Results** - figures and interpretations; notes
+[**Results**](Results/)- figures and interpretations; notes
 
-**Writing** - introduction, methods, discussion pages
+[**Writing**](Writing/)- introduction, methods, discussion pages
 
-**Temp**- temporary files created during data curation
+[**Temp**](Temp/)- temporary files created during data curation
 
 ## Packages you need
 
