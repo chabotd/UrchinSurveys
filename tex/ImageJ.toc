@@ -1,0 +1,10 @@
+\contentsline {section}{\numberline {1}Downloading ImageJ}{2}{section.1}%
+\contentsline {section}{\numberline {2}Open image in ImageJ}{2}{section.2}%
+\contentsline {subsection}{\numberline {2.1}Download photo from Box}{2}{subsection.2.1}%
+\contentsline {subsection}{\numberline {2.2}Open photo in ImageJ}{2}{subsection.2.2}%
+\contentsline {section}{\numberline {3}ImageJ Setup}{2}{section.3}%
+\contentsline {subsection}{\numberline {3.1}Set the measurement scale}{2}{subsection.3.1}%
+\contentsline {subsection}{\numberline {3.2}Set the measurement to area}{4}{subsection.3.2}%
+\contentsline {section}{\numberline {4}Choosing urchins to measure}{5}{section.4}%
+\contentsline {section}{\numberline {5}Measuring urchins}{6}{section.5}%
+\contentsline {section}{\numberline {6}Entering Data}{8}{section.6}%
