@@ -1,7 +1,8 @@
 library(tidyverse)
 library(dplyr)
+library(vegan)
 
-urch <- read.csv("Data/UrchinData_2024.csv")
+urch <- read.csv("Data/UrchinData2024.csv")
 
 #look at how many pitted urchins
 summary(urch$PittedUrchins)
@@ -39,4 +40,34 @@ anova(urch_aov)
 canopy_aov <- aov(Total.Canopy~Zone, data=urch)
 anova(canopy_aov)
 
-      
+#NMDS practice 
+
+Pit <- urch %>%
+  filter(Zone %in% c("UPZ"))
+
+#drop indiv. cols
+pitcom <- Pit %>% 
+  select(-Initials.Entered, Date.Entered, SiteCode)
+
+#drop position columns
+pitcom<- Pit %>% select(-c(1:13, 15:44, 58))
+pitcom <- data.frame(lapply(pitcom, as.numeric))
+
+urch_matrix <- as.matrix(pitcom)
+
+
+#replace NA with 0
+urch_matrix[is.na(urch_matrix)] <- 0
+#remove rows where all are 0
+
+urch_matrix <- urch_matrix[rowSums(urch_matrix) != 0, ]  # Remove rows where all values are 0
+
+pit_nmds=metaMDS(urch_matrix, # Our community-by-species matrix
+        k=2) 
+
+stressplot(pit_nmds)
+
+plot(pit_nmds)
+ordiplot(pit_nmds,type="n")
+orditorp(pit_nmds,display="species",col="red",air=0.01)
+orditorp(pit_nmds,display="sites",cex=1.25,air=0.01)
