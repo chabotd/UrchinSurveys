@@ -1,9 +1,9 @@
 library(tidyverse)
 library(dplyr)
 library(vegan)
+library(mosaic)
 
 urch <- read.csv("Data/UrchinData2024.csv")
-#hi Delaney!
 
 #look at how many pitted urchins
 summary(urch$PittedUrchins)
