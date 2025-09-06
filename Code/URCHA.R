@@ -2,6 +2,8 @@ library(tidyverse)
 library(dplyr)
 library(vegan)
 library(mosaic)
+library(multcompView)
+library(ggplot2)
 
 urch <- read.csv("Data/UrchinData2024.csv")
 
@@ -12,13 +14,21 @@ summary(urch$PittedUrchins)
 BothPitUrch <- urch %>%
   filter(Zone %in% c("UPZ", "NPZ"))
 
-boxplot(BothPitUrch$PittedUrchins)
+boxplot(BothPitUrch$PittedUrchins, col='lightblue', 
+  main = "Spread of Pitted Urchins in UPZ and NPZ Combined",
+  xlab = "", ylab = "Pitted Urchin Count"
+)
+
 
 #just the NPZ pitted urchins
 NPZUrch <- urch %>%
   filter(Zone %in% c("NPZ"))
 
-boxplot(NPZUrch$PittedUrchins)
+boxplot(NPZUrch$PittedUrchins, col='pink',
+  main = "Spread of Pitted Urchin Counts in Non-Pit Zones",
+  xlab = "", ylab = "Pitted Urchin Count"
+)
+        
 
 #ratio of empty pits to full pits
 
@@ -60,6 +70,8 @@ boxplot(Total.Canopy~Zone, data=urch, col='lavender',
         main = "Percent Cover Canopy Kelp",
         xlab = "Zone", ylab = "Percent Cover Canopy Kelp"
 )
+
+  #why is NPZ in the graph twice?
 
 TukeyHSD(canopy_aov, conf.level=.95)
 
@@ -114,6 +126,41 @@ ggplot(canopy_gg, aes(x = Zone, y = Total.Canopy)) +
        x = "Urchin Subhabitat", y = "Mean Percent Total Canopy Cover") + 
   theme_minimal()
 
+   #Ella: One-way ANOVA + Tukey for the ANOVA - significance
+anova_model <- aov(Total.Canopy ~ Zone, data = canopy_gg)
+summary(anova_model)
+
+TukeyHSD(anova_model)
+tukey <- TukeyHSD(anova_model)
+
+  #Ella: adding A and B to the plot to show significance 
+tukey_letters <- multcompLetters4(anova_model, tukey)
+
+      #Turn into a data frame so ggplot can use it, calc mean canopy per zone
+letters_df <- data.frame(
+  Zone = names(tukey_letters$Zone$Letters),
+  Letters = tukey_letters$Zone$Letters
+)
+
+zone_means <- canopy_gg %>%
+  group_by(Zone) %>%
+  summarise(max_cover = max(Total.Canopy))
+
+plot_labels <- merge(zone_means, letters_df, by = "Zone")
+
+      #make new plot w/ letters attached to the max value
+ggplot(canopy_gg, aes(x = Zone, y = Total.Canopy)) + 
+  geom_boxplot(fill = "lavender") + 
+  labs(title = "Mean Percent Total Canopy Cover by Zone", 
+       x = "Urchin Subhabitat", y = "Mean Percent Total Canopy Cover") + 
+  theme_minimal() +
+  geom_text(data = plot_labels, aes(x = Zone, y = max_cover + 5, label = Letters), 
+            inherit.aes = FALSE)
+
+
+
+
+
 ggplot(algbothurch, aes(x = Zone, y = TotalAttachedDrift)) +  
   geom_boxplot(fill = "lavender") +  
   labs(title = "Mean Percentage of Drift Kelp by Zone", 
@@ -127,6 +174,9 @@ ggplot(algbothurch, aes(x = Zone, y = RatioPitUrch)) +
        x = "Urchin Subhabitat", 
        y = "Mean Number of Pitted Urchins") + 
   theme_minimal()
+    #"Error: object 'RatioPitUrch' not found"
+
+
 
 #NMDS practice 
 
