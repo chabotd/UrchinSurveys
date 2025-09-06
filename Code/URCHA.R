@@ -11,6 +11,10 @@ summary(urch$PittedUrchins)
 BothPitUrch <- urch %>%
   filter(Zone %in% c("UPZ", "NPZ"))
 
+#are there urchins at SH and YB
+capepep <- urch %>%
+  filter(SiteCode %in% c("YB", "SH"))
+
 boxplot(BothPitUrch$PittedUrchins)
 
 #just the NPZ pitted urchins
@@ -43,14 +47,18 @@ anova(urch_aov)
 summary(anova(urch_aov))
 plot(urch_aov)
 
+# Reorder the levels of sites 
+urch$SiteCode <- factor(urch$SiteCode, levels = c("BB", "FC", "YB", "SH", "SB", 
+                                                  "SC", "CB","RP", "WC", "CP", 
+                                                  "CMN", "CMS"))
+
+
 boxplot(MeanTest ~ SiteCode, data=urch, col='lavender', 
         main = "ANOVA test of Mean Test size per Site",
         xlab = "Site Code", ylab = "Mean Test Size (cm)"
 )
 
 TukeyHSD(urch_aov, conf.level=.95)
-
-#Canopy cover all sites
 
 canopy_aov <- aov(Total.Canopy~Zone, data=urch)
 anova(canopy_aov)
@@ -61,6 +69,71 @@ boxplot(Total.Canopy~Zone, data=urch, col='lavender',
 )
 
 TukeyHSD(canopy_aov, conf.level=.95)
+
+##########################################################
+#Canopy cover all sites- test 4 Sept 2025
+##########################################################
+#remove AZ- 
+OnlyUrch <- urch %>%
+  filter(Zone %in% c("NPZ", "UPZ"))
+
+# combine open and crevice into Nonpit
+
+OnlyUrch <- OnlyUrch %>% mutate(NonPit = OpenUrchins + CreviceUrchins)
+
+#by site
+
+canopy_aov <- aov(Total.Canopy~SiteCode, data=OnlyUrch)
+anova(canopy_aov)
+
+boxplot(Total.Canopy~SiteCode, data=OnlyUrch, col='darkgreen', 
+        main = "Percent Cover Canopy Kelp at Each Site",
+        xlab = "Site Code", ylab = "Percent Cover Canopy Kelp"
+)
+
+TukeyHSD(canopy_aov, conf.level=.95)
+
+##########################################################
+#Now with just pitted urchin numbers
+##########################################################
+
+#by site
+
+pitted_urch_aov <- aov(PittedUrchins~SiteCode, data=OnlyUrch)
+anova(pitted_urch_aov)
+
+# Reorder the levels of sites 
+OnlyUrch$SiteCode <- factor(OnlyUrch$SiteCode, levels = c("BB", "FC", "YB", "SH", "SB", 
+                                                  "SC", "CB","RP", "WC", "CP", 
+                                                  "CMN", "CMS"))
+
+boxplot(PittedUrchins~SiteCode, data=OnlyUrch, col='lavender', 
+        main = "Pitted Urchins by Site",
+        xlab = "Site Code", ylab = "Pitted Urchin Abundance"
+)
+
+##########################################################
+#Now with just non-pitted urchin numbers
+##########################################################
+
+#by site
+
+nonpitted_urch_aov <- aov(NonPit~SiteCode, data=OnlyUrch)
+anova(nonpitted_urch_aov)
+
+boxplot(NonPit~SiteCode, data=OnlyUrch, col='purple', 
+        main = "Nonpitted Urchins by Site",
+        xlab = "Site Code", ylab = "Nonpitted Urchin Abundance"
+)
+
+
+TukeyHSD(nonpitted_urch_aov, conf.level=.95)
+
+
+##########################################################
+#end
+##########################################################
+
 
 # bare rock cover
 
@@ -129,13 +202,114 @@ ggplot(algbothurch, aes(x = Zone, y = RatioPitUrch)) +
 
 #NMDS practice 
 
-Pit <- urch %>%
-  filter(Zone %in% c("UPZ")) %>%
-  filter(Mastocarpus!="4?") 
-Pit$Mastocarpus <-as.numeric(Pit$Mastocarpus)
+#all by zone
 
+urch$Mastocarpus <-as.numeric(urch$Mastocarpus)
+
+Urchcom<- urch %>% 
+  select(-44)
+Urchcom2 <- Urchcom [, 35:56]
+Urchcom2<- Urchcom2 %>%
+  mutate(across(everything(), ~replace_na(.x, 0)))
+
+UrchSq <- sqrt(Urchcom2)
+
+# Calculate Bray-Curtis dissimilarity matrix
+UrchSim <- vegdist(UrchSq, method = "bray")
+
+# Perform NMDS using the Bray-Curtis dissimilarity matrix
+Urchnmds <- metaMDS(UrchSim, k = 2, trymax = 40)
+Urchnmds_coords <- as.data.frame(scores(Urchnmds, display = "sites"))
+
+# Combine NMDS coordinates with the original metadata 
+Urch1 <- cbind(urch,Urchnmds_coords)
+UrchplotCape <- ggplot(data=Urch1, aes(x=NMDS1, y=NMDS2, color=Cape )) +
+  geom_point()
+plot(UrchplotCape)
+
+#by site?
+
+WC<- urch %>%
+  filter(SiteCode %in% c("WC"))
+WC$Mastocarpus <-as.numeric(WC$Mastocarpus)
+
+WCcom<- WC %>% 
+  select(-44)
+WCcom2 <- WCcom [, 35:56]
+WCcom2<- WCcom2 %>%
+  mutate(across(everything(), ~replace_na(.x, 0)))
+
+WCSq <- sqrt(WCcom2)
+
+# Calculate Bray-Curtis dissimilarity matrix
+WCSim <- vegdist(WCSq, method = "bray")
+
+# Perform NMDS using the Bray-Curtis dissimilarity matrix
+WCnmds <- metaMDS(WCSim, k = 2, trymax = 40)
+WCnmds_coords <- as.data.frame(scores(WCnmds, display = "sites"))
+
+# Combine NMDS coordinates with the original metadata 
+WC1 <- cbind(WC,WCnmds_coords)
+WCplotCape <- ggplot(data=WC1, aes(x=NMDS1, y=NMDS2, color=Zone )) +
+  geom_point()
+plot(WCplotCape)
+
+#algae
+Alg <- urch %>%
+  filter(Zone %in% c("AZ"))
+Alg$Mastocarpus <-as.numeric(Alg$Mastocarpus)
+
+algcom<- Alg %>% 
+  select(-44)
+algcom2 <- algcom [, 35:56]
+algcom2<- algcom2 %>%
+  mutate(across(everything(), ~replace_na(.x, 0)))
+
+AlgSq <- sqrt(algcom2)
+
+# Calculate Bray-Curtis dissimilarity matrix
+NonPitSim <- vegdist(NonPitSq, method = "bray")
+
+# Perform NMDS using the Bray-Curtis dissimilarity matrix
+NonPitnmds <- metaMDS(NonPitSim, k = 2, trymax = 40)
+NonPitnmds_coords <- as.data.frame(scores(NonPitnmds, display = "sites"))
+
+# Combine NMDS coordinates with the original metadata 
+NonPit1 <- cbind(NonPit,NonPitnmds_coords)
+NonPitplotCape <- ggplot(data=NonPit1, aes(x=NMDS1, y=NMDS2, color=Cape )) +
+  geom_point()
+plot(NonPitplotCape)
+#nonpit
 NonPit <- urch %>%
   filter(Zone %in% c("NPZ"))
+NonPit$Mastocarpus <-as.numeric(NonPit$Mastocarpus)
+
+nonpitcom<- NonPit %>% 
+  select(-44)
+nonpitcom2 <- nonpitcom [, 35:56]
+nonpitcom2<- nonpitcom2 %>%
+  mutate(across(everything(), ~replace_na(.x, 0)))
+
+NonPitSq <- sqrt(nonpitcom2)
+
+# Calculate Bray-Curtis dissimilarity matrix
+NonPitSim <- vegdist(NonPitSq, method = "bray")
+
+# Perform NMDS using the Bray-Curtis dissimilarity matrix
+NonPitnmds <- metaMDS(NonPitSim, k = 2, trymax = 40)
+NonPitnmds_coords <- as.data.frame(scores(NonPitnmds, display = "sites"))
+
+# Combine NMDS coordinates with the original metadata 
+NonPit1 <- cbind(NonPit,NonPitnmds_coords)
+NonPitplotCape <- ggplot(data=NonPit1, aes(x=NMDS1, y=NMDS2, color=Cape )) +
+  geom_point()
+plot(NonPitplotCape)
+
+#if you want to flip coords...then 
+# RecInxDist_BySiteYear2 <-RecInxDist_BySiteYear1 %>%
+#   #mutate(NMDS2 = -1*NMDS2) %>% #invert nMDS 2 so that earlier years are in bottom left of plot
+#   mutate(NMDS1 = -1*NMDS1)
+
 
 # #drop position columns
 # pitcom<- Pit %>% select(-c(1:44, 58))
@@ -163,6 +337,10 @@ NonPit <- urch %>%
 #sarahs code
 # Subset the data to include columns with RecInx classes
 
+Pit <- urch %>%
+  filter(Zone %in% c("UPZ")) %>%
+  filter(Mastocarpus!="4?") 
+Pit$Mastocarpus <-as.numeric(Pit$Mastocarpus)
 #same as pit com (19-58 community matrix)
 pitcom<- Pit %>% 
   select(-44)
@@ -201,3 +379,45 @@ plot(Pitplot)
 PitplotCape <- ggplot(data=Pit1, aes(x=NMDS1, y=NMDS2, color=Cape )) +
   geom_point()
 plot(PitplotCape)
+
+#########################
+#linear model for understory algae
+##########################
+summary(lm(PittedUrchins ~ Understory.algae, data = Pit))
+
+ggplot(Pit, aes(x = PittedUrchins, y = Understory.algae)) + 
+  geom_point() + stat_smooth(method = 'lm', se=FALSE) 
+
+
+summary(lm(PittedUrchins ~ Understory.algae, data = NPZUrch))
+
+ggplot(NPZUrch, aes(x = PittedUrchins, y = Understory.algae, color=Cape)) +
+  geom_point() + stat_smooth(method = 'lm', se=FALSE) 
+
+#try a Poisson model?
+
+poisson_model <- glm(PittedUrchins ~ Understory.algae, data = NPZUrch, family = poisson)
+summary(poisson_model)
+NPZUrch$predicted <- predict(poisson_model, type = "response")
+ggplot(NPZUrch, aes(x = Understory.algae, y = PittedUrchins)) +
+  geom_point() +  # Scatterplot of actual data
+  geom_line(aes(y = predicted), color = "blue") +  # Fitted Poisson regression line
+  labs(title = "Poisson Regression of Pitted Urchins vs Understory Algae",
+       x = "Understory Algae",
+       y = "Predicted Pitted Urchins")
+
+#what about a 
+
+#Attached Drift
+
+summary(lm(PittedUrchins ~ TotalAttachedDrift, data = Pit)) 
+
+ggplot(Pit, aes(x = PittedUrchins, y = TotalAttachedDrift, col = SiteCode)) +
+  geom_point() + stat_smooth(method = 'lm', se=FALSE) 
+
+#write a .csv file for Boiler urchins only
+
+CapeArago <- urch %>%
+  filter(SiteCode %in% c("SC", "SB"))
+
+write.csv(CapeArago,"CapeAragoUrchins.csv")
