@@ -1,0 +1,59 @@
+---
+title: "MarkdownTrial"
+author: "Delaney Chabot"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+```{r}
+library(tidyverse)
+library(dplyr)
+library(vegan)
+library(multcompView)
+library(ggplot2)
+
+```
+
+Set up 
+```{r}
+urch <- read.csv("Data/SURVEY_Urchin_Survey_Data_2025.csv")
+
+# Reorder the levels of sites 
+urch$SiteCode <- factor(urch$SiteCode, levels = c("BB", "FC", "YB", "SH", "SB", 
+                                                  "SC", "CB","RP", "WC", "CP", 
+                                                  "CMN", "CMS"))
+# add column for Empty:Present Pits
+urch <- urch %>% mutate(RatioPits = EmptyPits/PitsPresent)
+
+#add column for mean size
+
+urch <- urch %>% mutate(MeanTest = rowMeans(urch[, c("UrchinSize1", 
+                                                     "UrchinSize2", "UrchinSize3", "UrchinSize4", "UrchinSize5")]))
+```
+
+```{r cars}
+
+
+
+t.test(MeanTest ~ Zone, data = BothPitUrch)
+ggplot(BothPitUrch, aes(x = Zone, y = MeanTest)) +
+  geom_boxplot(fill = "lavender") +
+  labs(title = "Urchin Size Differences",
+       x = "Type of Subhabitat",
+       y = "Mean Urchin Test Size (cm)") +
+  theme_minimal()
+
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
