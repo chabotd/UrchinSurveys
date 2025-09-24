@@ -5,7 +5,7 @@ library(multcompView)
 library(ggplot2)
 
 ################################################################################
-urch <- read.csv("Data/SURVEY_Urchin_Survey_Data_2025.csv")
+urch <- read.csv("SURVEY_Urchin_Survey_Data_2025.csv")
 
 # Reorder the levels of sites 
 urch$SiteCode <- factor(urch$SiteCode, levels = c("BB", "FC", "YB", "SH", "SB", 
@@ -113,5 +113,34 @@ ggplot(OnlyUrch, aes(x=NonPit, y=Total.Canopy)) +
 
 lm_modelNonPit <- lm(Total.Canopy ~ NonPit, data = OnlyUrch)
 anova(lm_modelNonPit)
+
+
+
+##########################
+#canopy cover by zone - filter into 2 datasets
+OnlyUrch <- urch %>%
+  filter(Zone %in% c("UPZ", "NPZ"))
+
+OnlyAlgal <- urch %>%
+  filter(Zone == "AZ")
+
+#plot for algal zone only
+ggplot(OnlyAlgal, aes(x = TotalUrchins, y = Total.Canopy)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE, color = "darkgreen") +
+  labs(title = "Urchin vs. Algal Canopy (Algal Zone)",
+       x = "Urchin Count",
+       y = "Total Canopy (%)") +
+  theme_minimal()
+
+#plot for UPZ and NPZ together
+ggplot(OnlyUrch, aes(x = TotalUrchins, y = Total.Canopy)) +
+  geom_point(alpha = 0.6, size = 2) +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(title = "Urchin vs. Algal Canopy (Urchin Zones)",
+       x = "Urchin Count",
+       y = "Total Canopy (%)",
+       color = "green") +
+  theme_minimal()
 
 
