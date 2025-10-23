@@ -83,6 +83,47 @@ ggplot(OnlyUrch, aes(x=TotalUrchins, y=Total.Canopy)) +
   labs(title='Total Urchins to Total Canopy',
        x='Urchin Count', y='Total Canopy (percent)')
 
+#####
+# Fit the linear model
+model <- lm(Total.Canopy ~ TotalUrchins, data = OnlyUrch)
+
+# Extract key stats
+slope <- round(coef(model)[2], 3)
+intercept <- round(coef(model)[1], 3)
+r2 <- round(summary(model)$r.squared, 3)
+pval <- signif(summary(model)$coefficients[2, 4], 3)
+
+# Build math expression safely
+eq_label <- bquote(
+  italic(y) == .(intercept) + .(slope) %.% italic(x) ~ "," ~
+    R^2 == .(r2) ~ "," ~ italic(p) == .(pval)
+)
+
+# Plot with regression line and equation annotation
+library(ggplot2)
+
+ggplot(OnlyUrch, aes(x = TotalUrchins, y = Total.Canopy)) +
+  geom_point(size = 2, alpha = 0.7) +
+  stat_smooth(method = 'lm', se = FALSE, color = "blue", linewidth = 1) +
+  labs(
+    title = 'Total Urchins to Total Canopy',
+    x = 'Urchin Count',
+    y = 'Total Canopy (percent)'
+  ) +
+  annotate(
+    "text",
+    x = max(OnlyUrch$TotalUrchins) * 0.28,
+    y = max(OnlyUrch$Total.Canopy) * 0.95,
+    label = as.character(as.expression(eq_label)),
+    parse = TRUE,
+    hjust = 0,
+    size = 5
+  ) +
+  theme_minimal(base_size = 14)
+
+
+#####
+
 lm_model <- lm(Total.Canopy ~ TotalUrchins, data = OnlyUrch)
 
 plot(lm_model)#inspect the resids vs fits to check model- mostly oK
@@ -106,6 +147,9 @@ lm_modelPit <- lm(Total.Canopy ~ PittedUrchins, data = OnlyUrch)
 anova(lm_modelPit)
 
 #for non pitted urchins
+OnlyUrch$NonPit <- OnlyUrch$TotalUrchins - OnlyUrch$PittedUrchins
+
+
 ggplot(OnlyUrch, aes(x=NonPit, y=Total.Canopy)) +
   geom_point() + stat_smooth(method = 'lm', se=FALSE) + 
   labs(title='Nonpitted Urchins to Total Canopy',
@@ -114,6 +158,34 @@ ggplot(OnlyUrch, aes(x=NonPit, y=Total.Canopy)) +
 lm_modelNonPit <- lm(Total.Canopy ~ NonPit, data = OnlyUrch)
 anova(lm_modelNonPit)
 
+### with added y= and R2 values
+
+lm_modelNonPit <- lm(Total.Canopy ~ NonPit, data = OnlyUrch)
+
+# Extract equation and R² for labeling
+eq <- substitute(
+  italic(y) == a + b %.% italic(x) * "," ~~ italic(R)^2 ~ "=" ~ r2,
+  list(
+    a = format(coef(lm_modelNonPit)[1], digits = 2),
+    b = format(coef(lm_modelNonPit)[2], digits = 2),
+    r2 = format(summary(lm_modelNonPit)$r.squared, digits = 3)
+  )
+)
+
+ggplot(OnlyUrch, aes(x = NonPit, y = Total.Canopy)) +
+  geom_point(alpha = 0.7) +
+  stat_smooth(method = "lm", se = FALSE, linewidth = 1) +
+  labs(
+    title = "Nonpitted Urchins vs Total Canopy",
+    x = "Nonpitted Urchin Count",
+    y = "Total Canopy (%)"
+  ) +
+  annotate("text", 
+           x = Inf, y = Inf, 
+           label = as.character(as.expression(eq)),
+           parse = TRUE, 
+           hjust = 1.1, vjust = 1.5, 
+           size = 4)
 
 
 ##########################

@@ -19,7 +19,7 @@ library(ggplot2)
 
 Set up 
 ```{r}
-urch <- read.csv("Data/SURVEY_Urchin_Survey_Data_2025.csv")
+urch <- read.csv("/Users/elladreke/Git/UrchinSurveys/Data/SURVEY_Urchin_Survey_Data_2025.csv")
 
 # Reorder the levels of sites 
 urch$SiteCode <- factor(urch$SiteCode, levels = c("BB", "FC", "YB", "SH", "SB", 
@@ -35,8 +35,6 @@ urch <- urch %>% mutate(MeanTest = rowMeans(urch[, c("UrchinSize1",
 ```
 
 ```{r cars}
-
-
 
 t.test(MeanTest ~ Zone, data = BothPitUrch)
 ggplot(BothPitUrch, aes(x = Zone, y = MeanTest)) +
