@@ -1,7 +1,7 @@
 library(tidyverse)
 library(dplyr)
 library(vegan)
-library(mosaic)
+inslibrary(mosaic)
 library(multcompView)
 library(ggplot2)
 

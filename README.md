@@ -2,7 +2,8 @@
 
 This main directory contains files associated with urchin survey. Please use these files for your analyses.
 
-*UrchinSurveyData2024.csv*
+*UrchinSurveyData_2024.csv*
+*UrchinSurveyData_2024_clean.csv*
 
 ## Subdirectories
 
@@ -18,7 +19,7 @@ This main directory contains files associated with urchin survey. Please use the
 
 ## Packages you need
 
-Describe code Packages you need
+tidyverse
 
 ## Summaries of Data
 

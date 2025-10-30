@@ -1,0 +1,30 @@
+---
+title: "UrchinDataCleaning"
+author: "Delaney Chabot"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Load packages
+
+```{r}
+library(tidyverse)
+library(dplyr)
+```
+
+Import data
+
+```{r}
+urch <- read.csv("Data/UrchinData_Trial.csv")
+View(urch)
+```
+
+
+```{r}
+
+```
+
