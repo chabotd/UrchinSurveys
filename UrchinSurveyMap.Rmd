@@ -31,13 +31,29 @@ View(SiteList)
 
 
 long <- SiteList$Longitude
+long_subset <- SiteList_subset$Longitude
 lat <- SiteList$Latitude
+lat_subset <- SiteList_subset$Latitude
 Site <-SiteList$Site
 Reg <-SiteList$Region
+Reg_subset <- SiteList_subset$Region
 Reg<-factor(Reg, levels=c('Cape Foulweather','Cape Perpetua','Cape Arago','Cape Blanco', "Southern Oregon', 'Cape Mendocino"))#change Pred to a factor and make order for graphing and such
+Reg_subset <- factor(Reg_subset, levels=c('Cape Foulweather','Cape Perpetua','Cape Arago','Cape Blanco', 'Southern Oregon'))
+color_subset <- c("#90be6d","#f8961e", "#f94144", "#555599", "#66BBBB")
 
 SiteCode <-SiteList$SiteCode
+SiteCode_subset <- SiteList_subset$SiteCode
 ```
+
+Andrew Carsten Moreland makes a subset minus Nor Cal survey sites
+(For Ella's HC thesis w 10 survey plots in OR)
+```{r}
+SiteList_subset <- SiteList[-c(11,12),]
+print(SiteList_subset)
+```
+
+
+
 
 Make base map
 ```{r}
@@ -101,7 +117,7 @@ plot(map)
 #ggsave("LP_Map_final.jpg", width = 4, height = 5, dpi = 2000)
 ```
 
-Old Map???
+Old Map??? --> "real"
 ```{r}
 #map it
 map <-ggplot(data = SiteList, 
@@ -132,5 +148,35 @@ plot(map)
 #Don't overwrite these, I edited in illustrator
 ```
 
+Drella version
+```{r}
+map <-ggplot(data = SiteList_subset, 
+             aes(x=long_subset, 
+                 y = lat_subset, color = Reg_subset)) +   
+  geom_text_repel(aes( label = SiteList_subset$SiteCode),
+                  direction = "y", 
+                   nudge_x = -125, 
+                   min.segment.length = 0, 
+                   seed = 42, 
+                   box.padding = 0.5,
+                  size=3)+
+  geom_polygon(data = states,
+  aes(x = long, y = lat, group = group),  # use correct columns
+  color = "black",
+  fill = "white",
+  inherit.aes = FALSE) +
+  geom_point(size = 2, shape = 16) +
+  scale_color_manual(values= color_subset) +
+  coord_fixed(1.3) +
+  theme_classic()+
+  labs(x = "Longitude", y = "Latitude") +
+  scale_x_continuous(breaks = seq(-126,-116,2)) +
+  scale_y_continuous(breaks = seq(31,47,1)) +
+  coord_map(xlim = c(-126,-116), ylim = c(40,47))+
+  theme(legend.position = "none") 
+  
+
+plot(map)
+```
 
 
