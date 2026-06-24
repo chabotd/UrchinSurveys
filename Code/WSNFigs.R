@@ -186,7 +186,41 @@ wilcox.test(Total.Canopy ~ Subhabitat, data = urch2025)
 #pitted numbers and nonpitted numbers by site 
 ################################################################################
 
+###########
+#compare cryptic to noncryptic all sites
+##########
+#1. pivot longer
 
+OnlyUrch_long <- pivot_longer(OnlyUrch, cols = c(OpenUrchins, Cryptic), 
+                              names_to = "Type", values_to = "Count") %>%
+  mutate(Type = factor(Type, levels = c("OpenUrchins", "Cryptic")))
+
+#2. 
+
+site_comparisons <- OnlyUrch_long %>%
+  group_by(SiteCode) %>%
+  summarise(p_value = wilcox.test(Count ~ Type)$p.value)
+
+print(site_comparisons)
+
+#3. visualize
+
+pl4 <- ggplot(OnlyUrch_long, aes(x = Type, y = Count, fill = Type)) +
+  geom_boxplot(alpha = 0.6) +
+  facet_wrap(~ SiteCode, scales = "free_y") +
+  labs(x = "Urchin Type", y = "Density (count per 0.25m²)") +
+  theme_minimal()
+
+ggsave(filename = "Figures/openvcrypticSites.png", 
+       plot =pl4  , width = 8, height = 6, dpi = 300)
+
+ggplot(OnlyUrch_long, aes(x = Type, y = Count, fill = Type)) +
+  geom_boxplot(alpha = 0.6) +
+  geom_jitter(width = 0.2, alpha = 0.4, color = "black") +
+  stat_compare_means(method = "wilcox.test", label = "p.signif") +
+  facet_wrap(~ SiteCode) +
+  labs(x = "Urchin Type", y = "Density (count per 0.25m²)") +
+  theme_minimal()
 
 ################################################################################
 #urch count between subhabs

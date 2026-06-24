@@ -10,6 +10,10 @@ library(tweedie)
 library(statmod)
 library(cowplot)
 library(patchwork)
+library(maps)
+library(mapdata)
+library(ggrepel)
+library(ggspatial)
 
 
 ################################################################################
@@ -51,11 +55,19 @@ urch <- urch %>%
   )
 
 urch$Connectivity <- with(urch, case_when(
-  SiteCode %in% c("SC", "CB", "WC", "CP", "RP") ~ "Susceptible",
-  SiteCode %in% c("BB", "SB", "FC") ~ "Unlikely",
-  SiteCode %in% c("YB", "SH") ~ "Extremely Unlikely",
+  SiteCode %in% c("CB", "WC", "CP", "RP") ~ "Susceptible",
+  SiteCode %in% c("SC", "SB", "BB", "FC") ~ "Unlikely",
+  SiteCode %in% c("YB", "SH") ~ "None",
   TRUE ~ NA_character_  # for any sites not listed
 ))
+
+#and add levels to combine none and unlikely - 
+#this one may need to be adjusted as I change figures
+
+urch$Connectivity <- as.character(urch$Connectivity)
+urch$Connectivity[urch$Connectivity %in% c("Unlikely", "None")] <- "Not Likely"
+urch$Connectivity <- factor(urch$Connectivity)
+
 # don't look at AZ-- urchin-dominated zones only. 
 OnlyUrch <- urch %>%
   filter(Subhabitat %in% c("UPZ", "NPZ"))
@@ -70,7 +82,6 @@ OnlyUrch$PercentNonPitted <- (OnlyUrch$NonPit/ OnlyUrch$TotalUrchins) * 100
 OnlyUrch <- OnlyUrch %>% mutate(Cryptic = PittedUrchins + CreviceUrchins)
 
 # pitted + crevice together 
-
 
 
 ################################################################################
@@ -97,6 +108,59 @@ urch2024 <- OnlyUrch%>%
 
 urch2025 <- OnlyUrch%>%
   filter(Year %in% c("2025"))
+################################################################################
+######## Map
+################################################################################
+
+#1. import 
+
+SiteList <- read.csv("Data/IntertidalUrchinSitesOregon.csv")
+
+
+long <- SiteList$Longitude
+lat <- SiteList$Latitude
+Site <-SiteList$Site
+Reg <-SiteList$Region
+Reg<-factor(Reg, levels=c('Cape Foulweather','Cape Perpetua','Cape Arago',
+                          'Cape Blanco', 'Southern Oregon'))
+
+SiteCode <-SiteList$SiteCode
+
+states <- map_data("state")
+
+map <-ggplot(data = SiteList, 
+             aes(x=long, 
+                 y = lat, color = Susceptibility)) +   
+  geom_text_repel(
+    aes(x = long, y = lat, label = SiteCode, color = Susceptibility),
+    direction = "y", 
+    nudge_x = -125, 
+    min.segment.length = 0, 
+    seed = 42, 
+    box.padding = 0.5,
+    size = 5
+  ) +
+  geom_polygon(data = states, color = "black", fill = "gray90", aes(group=group)) + 
+  geom_point(size = 3, shape = 16) +
+  scale_color_manual(values= c("#577590","#90be6d","#f8961e", "#f94144", "#555599")) +
+  coord_fixed(1.3) +
+  theme_classic()+
+  labs(x="Longitude", y = "Latitude") +
+  scale_x_continuous(breaks = seq(-126,-116,2)) +
+  scale_y_continuous(breaks = seq(31,47,1)) +
+  coord_map(xlim = c(-126,-116), ylim = c(40,47))+
+  theme(
+    axis.title.x = element_text(size = 14),
+    axis.title.y = element_text(size = 14),
+    axis.text.x = element_text(size = 12),
+    axis.text.y = element_text(size = 12)
+  )
+
+
+plot(map)
+
+ggsave(filename = "Figures/SusepMap.png", 
+       plot =map  , width = 8, height = 6, dpi = 300)
 
 ################################################################################
 ######## Figure 1: Cryptic and Open Urchin Densities by Site
@@ -125,6 +189,17 @@ pl1 <- ggplot(OnlyUrch, aes(x = SiteCode, y = OpenUrchins, fill = SiteCode)) +
     x = "Site",
     y = "Urchin Density (count per 0.25m²)"
   ) +
+  scale_fill_manual(values = c(
+    "BB" = "orange2",
+    "FC" = "orange2",
+    "SC" = "orange2",
+    "SB" = "orange2",
+    "YB" = "royalblue4",
+    "SH" = "royalblue4",
+    "CB" = "darkolivegreen4",
+    "RP" = "darkolivegreen4",
+    "CP" = "darkolivegreen4",
+    "WC" = "darkolivegreen4"))+
   theme_minimal() +
   theme(
     legend.position = "none",
@@ -151,6 +226,17 @@ pl2 <- ggplot(OnlyUrch, aes(x = SiteCode, y = Cryptic, fill = SiteCode)) +
     x = "Site",
     y = "Urchin Density (count per 0.25m²)"
   ) +
+  scale_fill_manual(values = c(
+    "BB" = "orange2",
+    "FC" = "orange2",
+    "SC" = "orange2",
+    "SB" = "orange2",
+    "YB" = "royalblue4",
+    "SH" = "royalblue4",
+    "CB" = "darkolivegreen4",
+    "RP" = "darkolivegreen4",
+    "CP" = "darkolivegreen4",
+    "WC" = "darkolivegreen4"))+
   theme_minimal() +
   theme(
     legend.position = "none",
@@ -163,6 +249,59 @@ pl2 <- ggplot(OnlyUrch, aes(x = SiteCode, y = Cryptic, fill = SiteCode)) +
 
 ggsave(filename = "Figures/UrchinDensitiesbySiteCrpytic.png", 
        plot =pl2  , width = 8, height = 6, dpi = 300)
+
+###############################################################################
+######## Figure 2: Urchin migration possible vs unlikely 
+################################################################################
+
+#non pit
+kruskal.test(NonPit ~ Connectivity, data = OnlyUrch)
+
+pl3 <- ggplot(OnlyUrch, aes(x = Connectivity, y = NonPit, fill= Connectivity)) +
+  geom_boxplot(outlier.shape = NA, alpha = 0.6) +
+  geom_jitter(width = 0.2, alpha = 0.4, color = "black") +
+  labs(
+    x = "Urchin Migration Possibility",
+    y = "Non- Cryptic Urchin Density (count per 0.25m²)"
+  ) +
+  scale_fill_manual(values = c("NotLikely" = "orange2", "Susceptible" = "darkolivegreen4")) +
+  theme_minimal() +
+  theme(
+    legend.position = "none",
+    axis.title.x = element_text(size = 18),
+    axis.title.y = element_text(size = 18),
+    axis.text.x = element_text(size = 15),
+    axis.text.y = element_text(size = 15)
+  ) +
+  coord_flip()
+
+ggsave(filename = "Figures/OpenConnectivity.png", 
+       plot =pl3  , width = 8, height = 6, dpi = 300)
+# cryptic 
+
+kruskal.test(Cryptic ~ Connectivity, data = OnlyUrch)
+
+pl4 <-ggplot(OnlyUrch, aes(x = Connectivity, y = Cryptic, fill = Connectivity)) +
+  geom_boxplot(outlier.shape = NA, alpha = 0.6) +
+  geom_jitter(width = 0.2, alpha = 0.4, color = "black") +
+  labs(
+    x = "Urchin Migration Possibility",
+    y = "Cryptic Urchin Density (count per 0.25m²)"
+  ) +
+  scale_fill_manual(values = c("NotLikely" = "orange2", "Susceptible" = "darkolivegreen4")) +
+  theme_minimal() +
+  theme(
+    legend.position = "none",
+    axis.title.x = element_text(size = 18),
+    axis.title.y = element_text(size = 18),
+    axis.text.x = element_text(size = 15),
+    axis.text.y = element_text(size = 15)
+  ) +
+  coord_flip()
+
+ggsave(filename = "Figures/CrpyConnectivity.png", 
+       plot =pl4  , width = 8, height = 6, dpi = 300)
+
 
 ################################################################################
 ######## Figure 2: GLM of Canopy and Urchin Count by Subhabitat
@@ -264,6 +403,17 @@ main_plot <- ggplot(OnlyUrch, aes(x = SiteCode, y = Total.Canopy, fill =
   ) +
   facet_wrap(~ Year) +
   scale_y_continuous(limits = c(0, 100)) +
+  scale_fill_manual(values = c(
+    "BB" = "orange2",
+    "FC" = "orange2",
+    "SC" = "orange2",
+    "SB" = "orange2",
+    "YB" = "royalblue4",
+    "SH" = "royalblue4",
+    "CB" = "darkolivegreen4",
+    "RP" = "darkolivegreen4",
+    "CP" = "darkolivegreen4",
+    "WC" = "darkolivegreen4"))+
   theme_minimal() +
   theme(
     legend.position = "none",
@@ -314,6 +464,17 @@ main_plot_urch <- ggplot(OnlyUrch, aes(x = SiteCode, y = TotalUrchins, fill =
   ) +
   facet_wrap(~ Year) +
   scale_y_continuous(limits = c(0, 100)) +
+  scale_fill_manual(values = c(
+    "BB" = "orange2",
+    "FC" = "orange2",
+    "SC" = "orange2",
+    "SB" = "orange2",
+    "YB" = "royalblue4",
+    "SH" = "royalblue4",
+    "CB" = "darkolivegreen4",
+    "RP" = "darkolivegreen4",
+    "CP" = "darkolivegreen4",
+    "WC" = "darkolivegreen4"))+
   theme_minimal() +
   theme(
     legend.position = "none",

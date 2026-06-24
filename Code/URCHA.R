@@ -1,11 +1,11 @@
 library(tidyverse)
 library(dplyr)
 library(vegan)
-inslibrary(mosaic)
+library(mosaic)
 library(multcompView)
 library(ggplot2)
 
-urch <- read.csv("Data/UrchinData2024.csv")
+urch <- read.csv("Data/UrchinSurveys.csv")
 
 #look at how many pitted urchins
 summary(urch$PittedUrchins)
