@@ -15,6 +15,8 @@ library(statmod)
 ################################################################################
 urch <- read.csv("Data/WorkingUrchinSurveyData.csv")
 
+##########Cleaning Workflows###################################################
+
 #get rid of rows below 
 urch <- urch %>%
   dplyr::slice(1:715)
@@ -40,9 +42,16 @@ urch <- urch %>%
     "SC_2026_AZ_2_5", 
     "CB_2026_AZ_2_4"
   ))
+
+#drop avail bare rock since not clean
+urch <- urch %>%
+  select(-AvailableBareRock)
+
 #code to make something as.numeric
 #str(urch
 urch$SandCobble <-as.numeric(urch$SandCobble)
+
+
 
 # Reorder the levels of sites 
 urch$SiteCode <- factor(urch$SiteCode, levels = c("BB", "FC", "YB", "SH", "SB", 
@@ -103,9 +112,18 @@ urch$PercentCryptic <- (urch$Cryptic/ urch$TotalUrchins) * 100
 OnlyUrch <- urch %>%
   filter(Subhabitat %in% c("UPZ", "NPZ"))
 
-#drop avail bare rock since not clean
-urch <- urch %>%
-  select(-AvailableBareRock)
+
+
+################################################################################
+# Summary Stats Workflow
+#Former WSN Figs
+################################################################################
+
+
+
+
+
+
 
 
 ################################################################################
