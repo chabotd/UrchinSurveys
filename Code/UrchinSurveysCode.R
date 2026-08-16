@@ -17,39 +17,71 @@ urch <- read.csv("Data/WorkingUrchinSurveyData.csv")
 
 ##########Cleaning Workflows###################################################
 
-#get rid of rows below 
-urch <- urch %>%
-  dplyr::slice(1:715)
-# get rid of rows with NAs for now (will go back and photo-ID)
-urch <- urch %>%
-  filter(!Call_Number %in% c(
-    "CB_2026_UPZ_2_3",
-    "CB_2026_UPZ_2_4",
-    "CB_2026_UPZ_2_5"
-  ))
-
-urch <- urch %>%
-  filter(!Call_Number %in% c(
-    "SC_2026_AZ_1_1",
-    "SC_2026_AZ_1_2",
-    "SC_2026_AZ_1_3",
-    "SC_2026_AZ_1_4",
-    "SC_2026_AZ_1_5",
-    "SC_2026_AZ_2_1",
-    "SC_2026_AZ_2_2",
-    "SC_2026_AZ_2_3",
-    "SC_2026_AZ_2_4",
-    "SC_2026_AZ_2_5", 
-    "CB_2026_AZ_2_4"
-  ))
-
-#drop avail bare rock since not clean
-urch <- urch %>%
-  select(-AvailableBareRock)
+#check to see things are numeric or characters. 
+str(urch)
 
 #code to make something as.numeric
-#str(urch
-urch$SandCobble <-as.numeric(urch$SandCobble)
+#urch$SandCobble <-as.numeric(urch$SandCobble)
+
+#drop things if not needed
+#urch <- urch %>%
+#  select(-AvailableBareRock)
+
+#code get rid of rows below if needed (data clean, so ok)
+#urch <- urch %>%
+#  dplyr::slice(1:715)
+
+# get rid of rows with NAs for now (will go back and photo-ID) 
+#** these are missing, so can probably delete
+#urch <- urch %>%
+#  filter(!Call_Number %in% c(
+#    "CB_2026_UPZ_2_3",
+#    "CB_2026_UPZ_2_4",
+#    "CB_2026_UPZ_2_5"
+#  ))
+
+
+#drop 100% cover column 
+urch<- urch%>% 
+  select(-TotalPrimaryCover)
+
+# parce out substrate columns 
+
+urch <- urch %>%
+  mutate(
+    OldSubstrateType = na_if(OldSubstrateType, ""),
+    
+    New_Rugosity = case_when(
+      OldSubstrateType == "VD" ~ "Varied",
+      OldSubstrateType == "VB" ~ "Varied",
+      OldSubstrateType == "FB" ~ "Flat",
+      OldSubstrateType == "FD" ~ "Flat",
+      OldSubstrateType == "CC" ~ "Flat",
+      OldSubstrateType == "CB" ~ "Flat",
+      OldSubstrateType == "TP" ~ "Varied",
+      OldSubstrateType == "CD" ~ "Varied",
+      OldSubstrateType == "WB"  ~ "Wall",
+      OldSubstrateType == "WD"  ~ "Wall",
+      OldSubstrateType == "DD"  ~ "Deep",
+      TRUE ~ NA_character_
+    ),
+    
+    New_Substrate = case_when(
+      OldSubstrateType == "VD" ~ "Boulder",
+      OldSubstrateType == "VB" ~ "Bench",
+      OldSubstrateType == "FB" ~ "Bench",
+      OldSubstrateType == "FD" ~ "Boulder",
+      OldSubstrateType == "CC" ~ "Cobbles",
+      OldSubstrateType == "CB" ~ "Cobbles",
+      OldSubstrateType == "TP" ~ "Tidepool",
+      OldSubstrateType == "CD" ~ "Cobbles",
+      OldSubstrateType == "WB"  ~ "Bench",
+      OldSubstrateType == "DD"  ~ "Boulder",
+      OldSubstrateType == "WD"  ~ "Boulder",
+      TRUE ~ NA_character_
+    )
+  )
+
 
 
 
@@ -73,8 +105,8 @@ urch<- urch %>%
 urch <- urch %>% mutate(TotalUrchins = TotalAdultUrchins + JuvenileUrchins)
 
 ##if not using Cali data use this.
-#urch<- urch %>%
-#  filter(!(SiteCode %in% c("CMS", "CMN")))
+urch<- urch %>%
+  filter(!(SiteCode %in% c("CMS", "CMN")))
 
 # add column for TotalPits and Ratio of Empty:Full
 urch <- urch %>% mutate(RatioPits = EmptyPits/PitsPresent)
@@ -94,6 +126,9 @@ urch$Connectivity <- with(urch, case_when(
   TRUE ~ NA_character_  # for any sites not listed
 ))
 
+# percent pitted
+urch$PercentPitted <- (urch$PittedUrchins/ urch$TotalAdultUrchins) * 100
+
 # add nonpits together (IF ONLY LOOKING AT PITTED)
 urch<- urch %>% mutate(NonPit = OpenUrchins + CreviceUrchins)
 
@@ -104,44 +139,66 @@ urch <- urch %>% mutate(Cryptic = PittedUrchins + CreviceUrchins)
 
 urch$PercentCryptic <- (urch$Cryptic/ urch$TotalUrchins) * 100
 
+
+
 ####### just know that Crevice count twice 
 #& CANNOT compare Cryptic to NonPit; only Open! 
+
+#re order all columns
+urch <- urch %>%
+  relocate(New_Rugosity, New_Substrate, .after = OldSubstrateType)
+urch <- urch %>%
+  relocate(TotalPits, RatioPits,PercentOccupancy, PercentNonPitted, 
+           .after = PitsPresent)
+urch <- urch %>%
+  relocate(MeanTest, .after = UrchinSize5)
+urch <- urch %>%
+  relocate(Connectivity, .after = Cape)
+urch <- urch %>%
+  relocate(NonPit, Cryptic, .after = OpenUrchins)
+urch <- urch %>%
+  relocate(PercentPitted, PercentNonPitted, PercentCryptic, .after = RedUrchins)
+urch <- urch %>%
+  relocate(TotalUrchins, .after = New_Substrate)
 
 
 # don't look at AZ-- urchin-dominated zones only. 
 OnlyUrch <- urch %>%
   filter(Subhabitat %in% c("UPZ", "NPZ"))
 
-
-
 ################################################################################
-# Summary Stats Workflow
-#Former WSN Figs
+#NMDS and PERMANOVA
 ################################################################################
+# Need to decide which of the following to do 
+
+#1. by subhabitat (UPZ, NPZ, AZ) for all
+#2. by subhabitat by site
+#3. by subhabitat by cape
+
+#a. include: urchin data: urchins, empty pits, 
+#b. include: community algal canopy (just algal canopy + urchin cover)
+#c. include: community primary space (urchin cover + primary + canopy spp.)
+
+#1. by subhabitat
+######### all zones ############################################################
+
+#2. by site / cape per subhabitat
 
 
-
-
-
-
-
-
-################################################################################
-#NMDS 
-################################################################################
-#nonpit zone nmds
-
+#these first few all work. Just not sure I need them. 
+######### nonpit zone by site and cape #########################################
+# this code looks at just community primary space + canopy. no urchin cover ####
 NonPit <- urch %>%
-  filter(Subhabitat %in% c("NPZ"))
+  filter(Subhabitat == "NPZ")
+#         SiteCode != "FC")
 
-#code to make something as.numeric
-#str(NonPit)
-NonPit$SandCobble <-as.numeric(NonPit$SandCobble)
 
-#nmds doing something....
+
+#nmds doing something....drop 100% column 
+
 nonpitcom<- NonPit %>% 
-  select(-44)
-nonpitcom2 <- nonpitcom [, 35:56]
+  select(-AvailableBareRock)
+nonpitcom2 <- nonpitcom [, 47:55]
 nonpitcom2<- nonpitcom2 %>%
   mutate(across(everything(), ~replace_na(.x, 0)))
 
@@ -184,8 +241,29 @@ plot(NonPitplotSite)
 ggsave(filename = "Figures/nonpitSiteNMDS.png", 
        plot = NonPitplotSite , width = 8, height = 6, dpi = 300)
 
-##########pit zone
-################################################################################
+############## permanovas #####################################################
+dispersion <- betadisper(NonPitSim, NonPit$SiteCode, type="centroid")
+plot(dispersion)
+ggsave(filename = "Figures/dispersion.png", 
+       plot = dispersion , width = 8, height = 6, dpi = 300)
+anova(dispersion)
+
+TukeyHSD(dispersion)
+
+
+
+NonPit_perma <- adonis2(
+  NonPitSim ~ Cape + SiteCode,
+  data = NonPit,
+  permutations = 999
+)
+
+NonPit_perma
+
+
+
+
+########## pit zone ############################################################
 #pit zone nmds
 
 Pit <- urch %>%
@@ -196,8 +274,8 @@ Pit <- urch %>%
 #question do I keep urchin cover?
 
 pitcom<- Pit %>% 
-  select(-44)
-pitcom2 <- pitcom [, 35:56]
+  select(-AvailableBareRock)
+pitcom2 <- pitcom [, 47:55]
 pitcom2<- pitcom2 %>%
   mutate(across(everything(), ~replace_na(.x, 0)))
 
@@ -235,8 +313,7 @@ plot(PitplotSite)
 ggsave(filename = "Figures/pitSiteNMDS.png", 
        plot = PitplotSite , width = 8, height = 6, dpi = 300)
 
-##########algal zone by cape 
-################################################################################
+########## algal zone by cape ##################################################
 #algal zone nmds
 
 Algal <- urch %>%
@@ -285,3 +362,97 @@ plot(AlgplotSite)
 
 ggsave(filename = "Figures/algalsiteNMDS.png", 
        plot = AlgplotSite , width = 8, height = 6, dpi = 300)
+
+################################################################################
+# PERMANOVA for urchin density, pit density, occupancy, drift kelp, canopy
+################################################################################
+#1. Nonpit Zone
+
+#2. Pit Zone
+pitperma<- Pit %>% 
+  select(TotalAdultUrchins, CreviceUrchins, OpenUrchins, JuvenileUrchins, 
+         EmptyPits, PitsPresent, TotalAttachedDrift, TotalCanopy)
+
+pitperma<- pitperma %>%
+  mutate(across(everything(), ~replace_na(.x, 0)))
+
+pitperma<- pitperma[rowSums(pitperma) > 0, ]
+
+
+PitpermaSq <- sqrt(pitperma)
+
+#temporary for unclean data
+PitpermaSq_noNA <- PitpermaSq %>% select(where(~ !any(is.na(.))))
+
+#make Bray 
+PitSim2 <- vegdist(PitpermaSq_noNA, method = "bray")
+
+Pitnmds2 <- metaMDS(PitSim2, k = 2, trymax = 40)
+
+Pitnmds_coords2 <- as.data.frame(scores(Pitnmds2, display = "sites"))
+
+Pit2 <- cbind(Pit,Pitnmds_coords2)
+
+# plot by Cape 
+PitCape <- ggplot(data=Pit2, aes(x=NMDS1, y=NMDS2, color=Cape )) +
+  geom_point(size = 1) +
+  stat_ellipse(linewidth = .5) +
+  labs(title = "Pit Subhabitat Urchin Data by Cape")
+plot(PitCape)
+
+ggsave(filename = "Figures/pitNMDS.png", 
+       plot = PitplotCape , width = 8, height = 6, dpi = 300)
+
+# plot by Site
+PitplotSite <- ggplot(data=Pit1, aes(x=NMDS1, y=NMDS2, color=SiteCode )) +
+  geom_point(size = 1) +
+  stat_ellipse(linewidth = .5) +
+  labs(title = "Pit Subhabitat NMDS by Site")
+plot(PitplotSite)
+
+ggsave(filename = "Figures/pitSiteNMDS.png", 
+       plot = PitplotSite , width = 8, height = 6, dpi = 300)
+
+
+
+
+#2. Pit Zone 
+#3. Algal Zone 
+
+
+
+
+
+
+
+
+################################################################################
+# Summary Stats Workflow
+#Former WSN Figs
+################################################################################
+
+
+
+################################################################################
+#Upwelling MLR
+################################################################################
+
+######### Bring in data ########################################################
+beuti <- read.csv("Data/BEUTI_monthly.csv")
+cuti <- read.csv("Data/CUTI_monthly.csv")
+
+######### set up ########################################################
+
+######### set up ########################################################
+
+
+
+
+
+
+
+################################################################################
+# Another MLR
+################################################################################
+
+

@@ -13,7 +13,7 @@ library(tidyverse)
 Run data cleaning
 
 ```{r}
-source(.../data_prep.R)
+source("Code/data_prep.R")
 ```
 
 Run analysis

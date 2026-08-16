@@ -1,0 +1,309 @@
+---
+title: "CRAZIE Ordination Analyses"
+author: "Zechariah Meunier"
+date: "Last updated `r format(Sys.Date(), '%B %d, %Y')`"
+output: pdf_document
+editor_options: 
+  chunk_output_type: console
+---
+### Libraries and Data
+
+Load libraries:  
+
+* `ggplot2` for creating data visualizations
+* `ggConvexHull` for adding convex hull geom to ggplot2
+* `vegan` for NMDS ordinations
+* `pairwiseAdonis` for multilevel pairwise PERMANOVA
+* `extrafont` for custom fonts
+* `rcartocolor` for custom colors
+* `grid` for graphical objects
+* `gridExtra` for grid graphics
+* `tibble` for simple data frames
+* `ggrepel` for repelling overlapping text labels
+```{r message=FALSE}
+library(ggplot2)
+#library(ggConvexHull)
+library(vegan)
+#library(pairwiseAdonis)
+library(extrafont)
+loadfonts(device = "all", quiet = TRUE) 
+library(rcartocolor)
+library(grid)
+library(gridExtra)
+library(tibble)
+library(ggrepel)
+```
+
+Create color vectors unique to each factor.
+```{r}
+trtcolors <- c("#377eb8", "#e41a1c", "#4daf4a", "black")
+
+capecolors <-  carto_pal(n = 5, "ag_Sunset")
+
+sitecolors <- c("#542788","#8073ac","#313695",
+                "#4575b4","#74add1","#abd9e9",
+                "gold4","gold","#fee090","#fdae61",
+                "#f46d43","#d73027","#a50026")
+
+periodcolors <- c("dodgerblue","firebrick","#f46d43")
+```
+
+Create explanatory variable matrix (`varmat`) by joining sea surface temperature anomaly, upwelling, and Pisaster size data.
+```{r}
+varmat <- 
+  left_join(
+    left_join(
+      left_join(dscmat_subset, Lag0SSTa, by = c("Cape", "Year")),
+    annual_BEUTI, by = c("Cape", "Year")),
+  meanSizeAnnual, by = c("Cape", "Year"))
+
+varmat <- dscmat_subset
+varmat$Cape <- factor(varmat$Cape, levels = c("CF","CP","CB","CM"))
+varmat$Site <- factor(varmat$Site, levels = c("FC","BB","MB","YB","SH","TK","CBN",
+                                              "CBS","POH","RP","CMN","CMS","KH"))
+varmat$Year <- factor(varmat$Year, levels = c("2006","2007","2008","2009","2010",
+                                              "2011","2012","2013","2014","2015",
+                                              "2016","2017","2018","2019","2020"))
+varmat$Trt <- factor(varmat$Trt, levels = c("C","R","A","I"))
+varmat$Rep <- factor(varmat$Rep)
+
+table(varmat$binSSTa, varmat$Year)
+plot(varmat$meanSSTa, varmat$meanPisDiam,
+     xlab = "Intertidal Water Temperature Anomaly",
+     ylab = "Pisaster Diameter")
+```
+
+
+### Nonmetric Multidimensional Sclaing (NMDS)
+
+Perform NMDS in 2 dimensions (k=2) with Bray-Curtis dissimilarities per cape and treatment.
+```{r}
+NMDScape <- "CF" #specify cape
+NMDStrt <- "I" #specify treatment
+NMDSmat <- filter(sslFGmat, row.names(sslFGmat) %in% 
+                    filter(dscmat_subset, Trt==NMDStrt, Cape==NMDScape)$PlotID)
+envmat <- filter(varmat, row.names(sslFGmat) %in% 
+                    filter(dscmat_subset, Trt==NMDStrt, Cape==NMDScape)$PlotID)
+
+NMDS <- metaMDS(NMDSmat, distance = "bray", k=2, trace=2, autotransform = FALSE,
+                maxit = 300, trymax = 30, halfchange = FALSE)
+stressplot(NMDS)
+```
+
+Save NMDS scores in a new data frame and add factors to it.
+```{r}
+scoresmat <- as.data.frame(scores(NMDS)[[1]])
+scoresmat$Cape <- factor(dscmat$Cape[match(rownames(scoresmat), dscmat$PlotID)],
+                                levels = c("CF","CP","CB","CM"))
+scoresmat$Site <- factor(dscmat$Site[match(rownames(scoresmat), dscmat$PlotID)],
+                                levels = c("FC","BB","MB","YB","SH","TK","CBN",
+                                           "CBS","POH","RP","CMN","CMS","KH"))
+scoresmat$Year <- factor(dscmat$Year[match(rownames(scoresmat), dscmat$PlotID)],
+                                levels = c("2006","2007","2008","2009","2010",
+                                           "2011","2012","2013","2014","2015",
+                                           "2016","2017","2018","2019","2020"))
+scoresmat$Trt <- factor(dscmat$Trt[match(rownames(scoresmat), dscmat$PlotID)],
+                                levels = c("C","R","A","I"))
+scoresmat$PeriodMHW <- factor(dscmat$PeriodMHW[match(rownames(scoresmat), dscmat$PlotID)],
+                                levels = c("Before","During","After"))
+plot(scoresmat)
+
+sppvec <- as.data.frame(scores(NMDS)[[2]])
+```
+
+Create basic plot.
+```{r}
+plot(NMDS, xlim = c(-0.85,0.85), ylim=c(-0.85,0.85))
+ordiellipse(scoresmat[,1:2], groups = scoresmat$PeriodMHW, conf = 0.95)
+```
+
+Fit functional groups and environmental conditions to the NMDS scores.
+```{r}
+sppfit <- envfit(NMDS, NMDSmat, permutations = 999)
+head(sppfit)
+sigspp <- as.data.frame(scores(sppfit, display = "vectors")) %>%
+  mutate(Pval = sppfit$vectors$pvals) %>%
+  rownames_to_column(var = "FuncGroup") %>%
+  mutate(Abbreviation = recode(FuncGroup,
+                               "Substrate" = "Rock",
+                               "Acorn barnacles" = "Balanoids",
+                               "Gooseneck barnacles" = "Goosenecks",
+                               "Crustose fleshy algae" = "CFA",
+                               "Crustose coralline algae" = "CCA",
+                               "Articulated coralline algae" = "ACA",
+                               "Bladed algae" = "BA",
+                               "Finely branched algae" = "FBA",
+                               "Coarsely branched algae" = "CBA",
+                               "Turf algae" = "TA",
+                               "Kelps & fucoids" = "Kelps")) %>%
+  filter(Pval <= 0.001)
+
+envfit <- envfit(NMDS, envmat[,c(17,19,22)], permutations = 999, na.rm = TRUE)
+head(envfit)
+sigenv <- as.data.frame(scores(envfit, display = "vectors")) %>%
+  mutate(Pval = envfit$vectors$pvals) %>%
+  rownames_to_column(var = "Factor") %>%
+  mutate(Abbreviation = recode(Factor,
+                               "meanSSTa" = "SSTa",
+                               "meanPisDiam" = "Pisaster\u2205",
+                               "meanBEUTI" = "BEUTI"
+                               )) %>%
+  filter(Pval <= 0.05)
+```
+
+Calculate centroids for each factor based on NMDS scores.
+```{r}
+trtcent <- aggregate(cbind(NMDS1, NMDS2) ~ Trt, data = scoresmat, FUN = "mean")
+capecent <- aggregate(cbind(NMDS1, NMDS2) ~ Cape, data = scoresmat, FUN = "mean")
+sitecent <- aggregate(cbind(NMDS1, NMDS2) ~ Site, data = scoresmat, FUN = "mean")
+periodcent <- aggregate(cbind(NMDS1, NMDS2) ~ PeriodMHW, data = scoresmat, FUN = "mean")
+```
+
+Create empty NMDS plot.
+```{r}
+NMDSplot <- ggplot(data = scoresmat, aes(x = NMDS1, y = NMDS2)) +
+  theme(axis.title = element_blank(),
+        #element_text(size = 10, face = "bold", color = "gray10",
+                                 # family = "Roboto") #use for axis titles
+        axis.text = element_text(size = 13, color ="gray10", family = "Roboto"),
+        axis.ticks = element_line(color = "gray10"),
+        panel.background = element_blank(),
+        panel.border = element_rect(fill = NA, color = "gray10", linewidth = 1),
+        legend.key = element_blank(), 
+        legend.position = "right",
+        legend.box.spacing = unit(0.1,"cm"),
+        legend.title = element_text(size = 10, face = "bold", color = "gray10",
+                                    family = "Roboto Medium"),
+        legend.text = element_text(size = 9, color = "gray10", family = "Roboto"),
+        legend.spacing.y = unit(0.25, 'cm'),
+        plot.tag = element_text(size = 20, color="gray10", family = "Roboto Medium"),
+        plot.tag.position = c(0.14,0.96)) +
+  coord_fixed(ratio = 1, clip = "on",
+              xlim = c(-0.85,0.85),
+              ylim = c(-0.85,0.85)) +
+  scale_x_continuous(breaks = seq(-0.8,0.8,0.4)) +
+  scale_y_continuous(breaks = seq(-0.8,0.8,0.4)) +
+  guides(color = guide_legend(override.aes = list(alpha = 1), byrow = TRUE, 
+                              keyheight = unit(0.5,"cm")))
+
+stresslab <- grobTree(textGrob(
+    paste("Stress: ", round(NMDS$stress, digits = 2)), x=0.81, y=0.925,
+    gp=gpar(col="black", fontsize=14, fontfamily = "Roboto")))
+```
+
+Plot NMDS colors by period.
+```{r}
+periodNMDS <- NMDSplot + 
+  geom_point(data = scoresmat, aes(color = PeriodMHW), size = 2, alpha = 0.2, 
+             show.legend = FALSE) +
+  #geom_convexhull(data = scoresmat, aes(color = PeriodMHW), size = 0.75, linetype = 2,
+  #                alpha = 0, show.legend = FALSE) + #use for convex hull
+  stat_ellipse(aes(color = PeriodMHW), size = 1.2, level = 0.95, show.legend = FALSE) +
+  geom_point(data = periodcent, aes(color = PeriodMHW), size = 5, alpha = 1,
+             show.legend = FALSE) +
+  geom_segment(data = sigspp, aes(x = 0, xend=NMDS1, y=0, yend=NMDS2), 
+               arrow = arrow(length = unit(0.25, "cm")), color = "grey10", lwd=0.5) +
+  geom_segment(data = sigenv, aes(x = 0, xend=NMDS1, y=0, yend=NMDS2), 
+               arrow = arrow(length = unit(0.25, "cm"), type = "closed"), lwd=0.9) +
+  geom_text_repel(data = sigspp, aes(x=NMDS1, y=NMDS2, label = Abbreviation, point.size = 2),
+                  direction = "both", box.padding = 0.3) +
+  geom_label_repel(data = sigenv, aes(x=NMDS1, y=NMDS2, label = Abbreviation),
+                  alpha = 1, fontface = "bold",
+                  segment.color = "black", segment.linetype = "dashed",
+                  direction = "both",  max.overlaps = 4, 
+                  nudge_x = c(0.55,-1,-0.1), nudge_y = c(-0.35,-0.1,-0.8),
+                  box.padding = 0.3, min.segment.length = 0) +
+  scale_color_manual(values = periodcolors, name = "Years",
+                     labels = c("2006\u20132014: \nPre-SSWD, \nBefore MHW",
+                                "2015\u20132016: \nPost-SSWD, \nDuring MHW",
+                                "2017\u20132020: \nPost-SSWD, \nAfter MHW")) +
+  labs(tag = "j") + 
+  annotation_custom(stresslab, xmin = -0.2, xmax = 0.8, ymin = 0.70, ymax = 0.85)
+
+ggsave(periodNMDS,
+       filename = paste0("Figures & Tables/NMDS/Period_",
+                         scoresmat$Cape[1],"_",scoresmat$Trt[1],"_ellipse2.jpg"), 
+       width = 4, height = 4, units = "in", dpi = 800)
+```
+
+Plot NMDS colors by cape.
+```{r}
+capeNMDS <- NMDSplot + 
+  geom_point(data = scoresmat, aes(color = Cape), size = 2, alpha = 0.2, 
+             show.legend = FALSE) +
+  geom_convexhull(data = scoresmat, aes(color = Cape), size = 0.75, linetype = 2,
+                  alpha = 0, show.legend = FALSE) +
+  geom_point(data = capecent, aes(color = Cape), size = 4, alpha = 1,
+             show.legend = FALSE) +
+  geom_segment(data = sigspp, aes(x = 0, xend=NMDS1, y=0, yend=NMDS2), 
+               arrow = arrow(length = unit(0.25, "cm")), color = "grey10", lwd=0.3) +
+  geom_text_repel(data = sigspp, aes(x=NMDS1, y=NMDS2, label = Abbreviation),
+                  cex = 3.75, direction = "both", segment.size = 0.25, box.padding = 0.3) +
+  scale_color_manual(values = capecolors,
+                     labels = c("Foulweather", "Perpetua",
+                                "Blanco", "Mendocino")) +
+  labs(tag = paste(scoresmat$Year[1]), color = "Cape") + 
+  annotation_custom(stresslab)
+
+ggsave(capeNMDS,
+       filename = paste0("Figures & Tables/NMDS/Cape_",scoresmat$Year[1],".png"), 
+       width = 4, height = 4, units = "in", dpi = 800)
+```
+
+Plot NMDS colors by site.
+```{r}
+NMDSplot + 
+  geom_point(data = scoresmat, aes(color = Site), size = 2, alpha = 0.3) +
+  geom_convexhull(data = scoresmat, aes(color = Site), linetype = 2, alpha = 0,
+               show.legend = FALSE) +
+  geom_point(data = sitecent, aes(color = Site), size = 3, alpha = 1, shape = 8,
+           show.legend = FALSE) +
+  scale_color_manual(values = sitecolors) +
+  theme(legend.position = "right", plot.tag.position = c(0.15,0.95)) +
+  labs(tag = paste(scoresmat$Year[1]), color = "Site")
+```
+
+Plot NMDS colors by treatment.
+```{r}
+trtNMDS <- NMDSplot + 
+  geom_point(data = scoresmat, aes(color = Trt), size = 2, alpha = 0.2,
+             show.legend = FALSE) +
+  geom_convexhull(data = scoresmat, aes(color = Trt), size = 0.75, linetype = 2,
+                  alpha = 0, show.legend = FALSE) +
+  geom_point(data = trtcent, aes(color = Trt), size = 4, alpha = 1, 
+             show.legend = FALSE) +  
+  geom_segment(data = sigspp, aes(x = 0, xend=NMDS1, y=0, yend=NMDS2), 
+               arrow = arrow(length = unit(0.25, "cm")), color = "grey10", lwd=0.3) +
+  geom_text_repel(data = sigspp, aes(x=NMDS1, y=NMDS2, label = Abbreviation),
+                  cex = 3.75, direction = "both", segment.size = 0.25, box.padding = 0.3) +
+  scale_color_manual(values = trtcolors, 
+                     labels = c("Control", "Recovery",
+                                "Macrophyte-only", "Invertebrate-only")) +
+  labs(tag = paste(scoresmat$Year[1]), color = "Treatment") + 
+  annotation_custom(stresslab)
+
+ggsave(trtNMDS,
+       filename = paste0("Figures & Tables/NMDS/Trt_",scoresmat$Year[1],".png"), 
+       width = 4, height = 4, units = "in", dpi = 800)
+```
+
+### Multivariate Statistics
+
+Calculate permutational multivariate analysis of variance (PERMANOVA).
+```{r}
+adonis2(sslFG_BC ~ Year * Cape * Site %in% Cape * Trt + Rep %in% Site,
+        data = varmat, na.action = na.exclude, permutations = 100, parallel = 2)
+```
+
+Calculate pairwise PERMANOVA to compare Bray-Curtis dissimilarities between periods within treatment and cape.
+```{r}
+setCape <- "CM" #specify cape
+setTrt <- "I" #specify treatment
+sslFG_BC_subset <- as.matrix(vegdist(
+  filter(sslFGmat, row.names(sslFGmat) %in% 
+                    filter(dscmat_subset, Trt==setTrt, Cape==setCape)$PlotID),
+  method = "bray"))
+
+pairwise.adonis(x=sslFG_BC_subset,
+        filter(dscmat_subset, Trt==setTrt, Cape==setCape)$PeriodMHW, perm = 999)
+```

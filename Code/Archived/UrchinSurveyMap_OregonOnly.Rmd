@@ -6,7 +6,9 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_knit$set(root.dir = getwd())
+
+knitr::opts_knit$set(root.dir = rstudioapi::getActiveProject())
+
 
 ```
 
@@ -25,12 +27,12 @@ library(ggspatial)
 **THIS IS FROM ANOTHER PROJECT AND NEEDS TO BE ADJUSTED TO THE urchin survey SITES**
 Import Data
 ```{r}
+
 #Map of Sites----
 #SiteList <- read.csv("Data/IntertidalUrchinSites.csv")
 #read.csv("Data/IntertidalUrchinSites.csv")
 
 #you will have to do this by hand in command line for some reason?
-
 SiteList <- read.csv("Data/IntertidalUrchinSitesOregon.csv")
 
 
@@ -50,62 +52,7 @@ states <- map_data("state")
 #  subset(region %in% c("california", "oregon"))
 ```
 
-Customize map need to figure out colors. 
-```{r}
-map <-ggplot(data = SiteList, 
-             aes(x=long, y = lat, color = Region)) +   
-  geom_polygon(data = states, color = "black", fill = "gray90", aes(group=group)) + 
-  geom_point(aes(shape = State), size = 2) +
-  scale_color_manual(values= c("#0072B2","#009E73","#D55E00", "#f94144",  "#66BBBB","#555599")) +
-  labs(x = bquote("Longitude ("*degree~"W)"),
-       y = bquote("Latitude ("*degree~"N)")) +
-  annotate("text", color = c("#0072B2","#009E73","#D55E00",  "#f94144", "#555599", "#66BBBB"),
-           size = 3.5,
-           fontface = "bold",
-           x = c(-122.1, -122.1, -122.7, -122.8, -122.5, -122.3),
-           y = c(45, 44.6, 43.4, 43, 42.2, 40.5),
-           label = c("Cape Foulweather",
-                     "Cape Perpetua", "Cape Arago", "Cape Blanco",
-                     "Southern Oregon", "Cape Mendocino")) +
-  scale_x_continuous(breaks = seq(-128,-114,2)) +
-  scale_y_continuous(breaks = seq(32,46,1)) +
-  scale_shape_manual(values = c(16,1)) +
-  coord_map(xlim = c(-126,-118), ylim = c(40,46)) +
-  theme(legend.position = "none",
-        panel.grid.major=element_blank(),
-        panel.background=element_blank(),
-        panel.border=element_rect(color="black",fill=NA,size=1),
-        axis.text=element_text(color="black", size=10), 
-        axis.ticks=element_line(color="black")) +
-  geom_label_repel(mapping = aes(x= long, y= lat, label = SiteCode), 
-                   label.size = NA,
-                   hjust = 1, 
-                   force_pull = 0,
-                   #nudge_x = -0.5,
-                   #nudge_y = -0.3,
-                   xlim = c(-1, -0.09),
-                   box.padding = 0, 
-                   label.padding = 0.15,
-                   size=3.5) 
-  # scalebar(location = "bottomright", dist = 200, dist_unit = "km", 
-  #          transform = TRUE, model = "WGS84", height = 0.02, st.dist = 0.025,
-  #          st.size = 3.25, border.size = 0.5,
-  #          x.min = -128, x.max = -114, 
-  #          y.min = 32, y.max = 46,
-  #          anchor = c(x=-121, y=32.5)) +
-  #annotation_north_arrow(height = unit(1, "cm"),
-                         # width = unit(0.67, "cm"),
-                         # pad_x = unit(0.5, "cm"),
-                         # pad_y = unit(0.5, "cm"),
-                         # rotation = NULL,
-                         # style = north_arrow_orienteering)
-
-plot(map)
-#ggsave("LP_Map_final.pdf", width = 4, height = 5)
-#ggsave("LP_Map_final.jpg", width = 4, height = 5, dpi = 2000)
-```
-
-Old Map???
+Site Map and Suseptibilty map
 ```{r}
 #map it
 map <-ggplot(data = SiteList, 
@@ -138,9 +85,9 @@ map <-ggplot(data = SiteList,
   
 
 plot(map)
-#again have to save ggsave in command line
-#ggsave(filename = "Figures/Map.png", 
-#       plot = map , width = 8, height = 6, dpi = 300)
+
+ggsave(filename = "Figures/Map.png", 
+       plot = map , width = 8, height = 6, dpi = 300)
 #ggsave("Map.eps", width = 4, height = 6)
 #Don't overwrite these, I edited in illustrator
 ```
@@ -175,6 +122,9 @@ map <-ggplot(data = SiteList,
   
 
 plot(map)
+ggsave(filename = "Figures/SuseptibilityMap.png", 
+       plot = map , width = 8, height = 6, dpi = 300)
+
 ```
 
 
