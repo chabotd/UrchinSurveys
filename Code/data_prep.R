@@ -1,34 +1,74 @@
 library(tidyverse)
 library(dplyr)
+library(lubridate)
 ################################################################################
 #Read in Surveys dataset
 ################################################################################
 urch <- read.csv("Data/WorkingUrchinSurveyData.csv")
 
+# for later to fix recruit issue
+
+# library(writexl)
+# write_xlsx(urch, "Data/urch_updated.xlsx")
+
 ##########Cleaning Workflows###################################################
 
 #check to see things are numeric or characters. 
 str(urch)
+View(urch)
+
+# Date format 
+urch <- urch %>%
+  mutate(Date = mdy(Date))
+
+#rename zone to subhabitat
+
+urch<- urch %>%
+  rename(Subhabitat = Zone)
+
+#drop plot notsurveyed 
+
+urch <- urch %>%
+  filter(Call_Number!= "SB_2024_UPZ_2_4")
+
+#fix count of crevice urch here
+
+urch <- urch %>%
+  mutate(
+    CreviceUrchins = ifelse(
+      Call_Number == "SC_2026_NPZ_2_5",
+      17,
+      CreviceUrchins
+    )
+  )
 
 #code to make something as.numeric
-#urch$SandCobble <-as.numeric(urch$SandCobble)
+urch$AvailableBareRock <-as.numeric(urch$AvailableBareRock)
+# make all -bare rocks zero
+urch$AvailableBareRock[urch$AvailableBareRock < 0] <- 0
 
 #drop things if not needed
-#urch <- urch %>%
-#  select(-AvailableBareRock)
+urch <- urch %>%
+ select(-Mastocarpus, -Pyropia, -OtherRed, -UnknownRecruits, -Diatom, 
+        -Chondracanthus, -Erhythophyllum)
+
+#remove FC NPZ since it is not actually NPZ. 
+urch <- urch %>%
+  filter(!(SiteCode == "FC" & Subhabitat == "NPZ"))
 
 #code get rid of rows below if needed (data clean, so ok)
 #urch <- urch %>%
 #  dplyr::slice(1:715)
 
 # get rid of rows with NAs for now (will go back and photo-ID) 
-#** these are missing, so can probably delete
-#urch <- urch %>%
-#  filter(!Call_Number %in% c(
-#    "CB_2026_UPZ_2_3",
-#    "CB_2026_UPZ_2_4",
-#    "CB_2026_UPZ_2_5"
-#  ))
+# #** these are missing, so can probably delete
+# urch <- urch %>%
+#   filter(!Call_Number %in% c(
+#     "SB_2026_UPZ_2_4",
+# #    "CB_2026_UPZ_2_4",
+# #    "CB_2026_UPZ_2_5"
+#   ))
+
 
 
 #drop 100% cover column 
@@ -85,27 +125,23 @@ urch <- urch %>% mutate(MeanTest = rowMeans(urch[, c("UrchinSize1",
                                                      "UrchinSize3", 
                                                      "UrchinSize4", 
                                                      "UrchinSize5")]))
-#rename zone to subhabitat
-
-urch<- urch %>%
-  rename(Subhabitat = Zone)
 
 #add TOTAL number urchins (Juvs + Adults)
 
 urch <- urch %>% mutate(TotalUrchins = TotalAdultUrchins + JuvenileUrchins)
 
 ##if not using Cali data use this.
-urch<- urch %>%
-  filter(!(SiteCode %in% c("CMS", "CMN")))
+#urch<- urch %>%
+#  filter(!(SiteCode %in% c("CMS", "CMN")))
 
 # add column for TotalPits and Ratio of Empty:Full
-urch <- urch %>% mutate(RatioPits = EmptyPits/PitsPresent)
-urch <- urch %>% mutate(TotalPits = EmptyPits + PittedUrchins)
+# urch <- urch %>% mutate(RatioPits = EmptyPits/PitsPresent)
+# urch <- urch %>% mutate(TotalPits = EmptyPits + PittedUrchins)
 
 # add column for percent occupancy 
 urch <- urch %>%
   mutate(
-    PercentOccupancy = (PittedUrchins / TotalPits) * 100
+    PercentOccupancy = (PittedUrchins / PitsPresent) * 100
   )
 
 #susceptibility 
@@ -129,6 +165,11 @@ urch <- urch %>% mutate(Cryptic = PittedUrchins + CreviceUrchins)
 
 urch$PercentCryptic <- (urch$Cryptic/ urch$TotalUrchins) * 100
 
+#urchin cover
+urch <- urch %>%
+  mutate(UrchinCover = if_else(TotalAdultUrchins > 0 & UrchinCover == 0,
+                               NA_real_,
+                               UrchinCover))
 
 # Drift kelp 
 # need to take total drift and divide by urchin to get an estimate of % cover 
@@ -143,7 +184,7 @@ urch <- urch %>% mutate(DriftPerUrchin=
 urch <- urch %>%
   relocate(New_Rugosity, New_Substrate, .after = OldSubstrateType)
 urch <- urch %>%
-  relocate(TotalPits, RatioPits,PercentOccupancy, PercentNonPitted, 
+  relocate(PercentOccupancy, PercentNonPitted, 
            .after = PitsPresent)
 urch <- urch %>%
   relocate(MeanTest, .after = UrchinSize5)
@@ -153,6 +194,8 @@ urch <- urch %>%
   relocate(NonPit, Cryptic, .after = OpenUrchins)
 urch <- urch %>%
   relocate(PercentPitted, PercentNonPitted, PercentCryptic, .after = RedUrchins)
+urch <- urch %>%
+  relocate(TotalUrchins, .after = New_Substrate)
 urch <- urch %>%
   relocate(TotalUrchins, .after = New_Substrate)
 
