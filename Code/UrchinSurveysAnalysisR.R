@@ -1,12 +1,12 @@
 library(tidyverse)
 #library(dplyr)
 library(vegan)
-#library(multcompView)
+library(multcompView)
 library(ggplot2)
 #library(ggpubr)
 library(FSA)
 library(rcompanion)
-#library(tweedie)
+library(tweedie)
 library(statmod)
 library(viridis)
 library(kableExtra)
@@ -188,12 +188,21 @@ glm_tweedie_open <- glm(TotalCanopy ~ OpenUrchins,
                         family = tweedie(var.power = 1.5, link.power = 0))
 summary(glm_tweedie_open)
 
-        
-anova(glm_tweedie_open, glm_tweedie_cryp, test="LRT")
-
 
 NoPerpetua$PredictedCanopyCryp <- predict(glm_tweedie_cryp, type = "response")
 NoPerpetua$PredictedCanopyOpen <- predict(glm_tweedie_open, type = "response")
+
+#correlation between models?
+
+pred1 <- predict(glm_tweedie_open, type="response")
+pred2 <- predict(glm_tweedie_cryp, type="response")
+
+cor(pred1, pred2)
+
+glm3 <- glm(TotalCanopy ~ OpenUrchins + Cryptic,
+            data = OnlyUrch,
+            family = tweedie(var.power = 1.5, link.power = 0))
+
 
 ####################### faceted full set up
 
@@ -368,14 +377,46 @@ OregonUPZ<- OregonUrch %>%
 
 kruskal.test(NonPit ~ SiteCode, data = OregonUPZ)
 
-pl4 <- ggplot(OregonUPZ, aes(x = SiteCode, y = OpenUrchins, fill = SiteCode)) +
+# haave to create matrix properly to
+
+pw <- pairwise.wilcox.test(
+  x = OregonUPZ$OpenUrchins,
+  g = OregonUPZ$SiteCode,
+  p.adjust.method = "fdr"
+)
+
+tri <- pw$p.value
+sites <- sort(unique(OregonUPZ$SiteCode))
+
+full <- matrix(NA, length(sites), length(sites),
+               dimnames = list(sites, sites))
+
+full[rownames(tri), colnames(tri)] <- tri
+full[colnames(tri), rownames(tri)] <- t(tri)
+
+full[is.na(full)] <- 1
+
+letters <- multcompLetters(full)$Letters
+letters_df <- data.frame(SiteCode = names(letters),
+                         Letter = letters)
+
+plot_df <- OregonUPZ %>%
+  left_join(letters_df, by = "SiteCode")
+
+
+
+pl4 <- ggplot(plot_df, aes(x = SiteCode, y = OpenUrchins, fill = SiteCode)) +
   geom_boxplot(outlier.shape = NA, alpha = 0.6) +
-  stat_summary(fun = mean, geom = "point", shape = 23, size = 3, fill = "white", 
-               color = "black") +
-  # geom_jitter(width = 0.2, alpha = 0.4, color = "black") +
+  geom_text(
+    aes(label = Letter),
+    y = max(plot_df$OpenUrchins, na.rm = TRUE) * 1.01,
+    size = 6
+  ) +
+  stat_summary(fun = mean, geom = "point", shape = 23, size = 3,
+               fill = "white", color = "black") +
   labs(
     x = "Site",
-    y = "Open Urchin Density (count per 0.25m²) in UPZ"
+    y = "Open Urchin Density (count per 0.25m²) in Urchin Pit Dominated Subhabiat"
   ) +
   scale_fill_manual(values = c(
     "BB" = "orange2",
@@ -387,7 +428,10 @@ pl4 <- ggplot(OregonUPZ, aes(x = SiteCode, y = OpenUrchins, fill = SiteCode)) +
     "CB" = "darkolivegreen4",
     "RP" = "darkolivegreen4",
     "CP" = "darkolivegreen4",
-    "WC" = "darkolivegreen4"))+
+    "WC" = "darkolivegreen4",
+    "CMN" = "lightgrey",
+    "CMS" = "lightgrey"
+  )) +
   theme_minimal() +
   theme(
     legend.position = "none",
@@ -407,14 +451,45 @@ OregonNPZ<- OregonUrch %>%
 
 kruskal.test(NonPit ~ SiteCode, data = OregonNPZ)
 
-pl5 <- ggplot(OregonNPZ, aes(x = SiteCode, y = OpenUrchins, fill = SiteCode)) +
+
+pw <- pairwise.wilcox.test(
+  x = OregonNPZ$OpenUrchins,
+  g = OregonNPZ$SiteCode,
+  p.adjust.method = "fdr"
+)
+
+tri <- pw$p.value
+sites <- sort(unique(OregonNPZ$SiteCode))
+
+full <- matrix(NA, length(sites), length(sites),
+               dimnames = list(sites, sites))
+
+full[rownames(tri), colnames(tri)] <- tri
+full[colnames(tri), rownames(tri)] <- t(tri)
+
+full[is.na(full)] <- 1
+
+letters <- multcompLetters(full)$Letters
+letters_df <- data.frame(SiteCode = names(letters),
+                         Letter = letters)
+
+plot_df <- OregonNPZ %>%
+  left_join(letters_df, by = "SiteCode")
+
+# don't forget to run reorder sites
+
+pl5 <- ggplot(plot_df, aes(x = SiteCode, y = OpenUrchins, fill = SiteCode)) +
   geom_boxplot(outlier.shape = NA, alpha = 0.6) +
-  stat_summary(fun = mean, geom = "point", shape = 23, size = 3, fill = "white", 
-               color = "black") +
-  # geom_jitter(width = 0.2, alpha = 0.4, color = "black") +
+  geom_text(
+    aes(label = Letter),
+    y = max(plot_df$OpenUrchins, na.rm = TRUE) * 1.01,
+    size = 6
+  ) +
+  stat_summary(fun = mean, geom = "point", shape = 23, size = 3,
+               fill = "white", color = "black") +
   labs(
     x = "Site",
-    y = "Open Urchin Density (count per 0.25m²) in NPZ"
+    y = "Open Urchin Density (count per 0.25m²) in Nonpit Urchin Dominated Subhabiat"
   ) +
   scale_fill_manual(values = c(
     "BB" = "orange2",
@@ -426,7 +501,10 @@ pl5 <- ggplot(OregonNPZ, aes(x = SiteCode, y = OpenUrchins, fill = SiteCode)) +
     "CB" = "darkolivegreen4",
     "RP" = "darkolivegreen4",
     "CP" = "darkolivegreen4",
-    "WC" = "darkolivegreen4"))+
+    "WC" = "darkolivegreen4",
+    "CMN" = "lightgrey",
+    "CMS" = "lightgrey"
+  )) +
   theme_minimal() +
   theme(
     legend.position = "none",
@@ -437,11 +515,19 @@ pl5 <- ggplot(OregonNPZ, aes(x = SiteCode, y = OpenUrchins, fill = SiteCode)) +
   ) +
   coord_flip()
 
+
 ggsave(filename = "Temp/Q3/UrchinDensitiesbySiteOpeninNPZ.png", 
        plot =pl5  , width = 8, height = 6, dpi = 300)
 
 ############################
-kruskal.test(NonPit ~ Connectivity, data = OregonUrch)
+kruskal.test(OpenUrchins ~ Connectivity, data = OregonUrch)
+
+# can I do pairwise?
+pairwise.wilcox.test(
+  x = OregonUrch$OpenUrchins,
+  g = OregonUrch$Connectivity,
+  p.adjust.method = "fdr"
+)
 
 pl3 <- ggplot(OregonUrch, aes(x = Connectivity, y = NonPit, fill= Connectivity)) +
   geom_boxplot(outlier.shape = NA, alpha = 0.6) +
