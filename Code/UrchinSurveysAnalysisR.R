@@ -5,7 +5,7 @@ library(vegan)
 library(ggplot2)
 #library(ggpubr)
 library(FSA)
-#library(rcompanion)
+library(rcompanion)
 #library(tweedie)
 library(statmod)
 library(viridis)
@@ -69,6 +69,17 @@ connect <- c(
   "CP" = "darkolivegreen4",
   "WC" = "darkolivegreen4")
 
+susept <- c(
+  "BB" = "cornflowerblue",
+  "FC" = "cornflowerblue",
+  "SC" = "cornflowerblue",
+  "SB" = "cornflowerblue",
+  "YB" = "grey3",
+  "SH" = "grey3",
+  "CB" = "tomato2",
+  "RP" = "tomato2",
+  "CP" = "tomato2",
+  "WC" = "tomato2")
 View(urch)
 
 # don't look at AZ-- urchin-dominated zones only. 
@@ -175,7 +186,7 @@ summary(glm_tweedie_cryp)
 glm_tweedie_open <- glm(TotalCanopy ~ OpenUrchins,
                         data = NoPerpetua,
                         family = tweedie(var.power = 1.5, link.power = 0))
-summary(glm_tweedie_open
+summary(glm_tweedie_open)
 
         
 anova(glm_tweedie_open, glm_tweedie_cryp, test="LRT")
@@ -269,23 +280,56 @@ for (i in seq_along(sites)) {
 ################################################################################
 #only oregon urchin dom plots
 
-#remove YB and SH
-OregonUrch<- OnlyUrch %>%
-  filter(!(SiteCode %in% c("CMS", "CMN")))
+#remove YB and SH, CMS and CMN and FC because all zero
+OregonUrch<- NoPerpetua %>%
+  filter(SiteCode !="FC")
 
 # if on y-axis: 
 OregonUrch$SiteCode <- factor(OregonUrch$SiteCode, levels=c("CP", "WC" , 
-                                                "RP", "CB", "SC", "SB", "SH", 
-                                                "YB", "BB", "FC"))
+                                                "RP", "CB", "SC", "SB", "BB"))
 
-kruskal.test(NonPit ~ SiteCode, data = OregonUrch)
-dunnTest(NonPit ~ SiteCode, data = OregonUrch, method = "holm")
+kruskal.test(OpenUrchins~ SiteCode, data = OregonUrch)
+# haave to create matrix properly to
 
-pl1 <- ggplot(OregonUrch, aes(x = SiteCode, y = OpenUrchins, fill = SiteCode)) +
+pw <- pairwise.wilcox.test(
+  x = OregonUrch$OpenUrchins,
+  g = OregonUrch$SiteCode,
+  p.adjust.method = "fdr"
+)
+
+tri <- pw$p.value
+sites <- sort(unique(OregonUrch$SiteCode))
+
+full <- matrix(NA, length(sites), length(sites),
+               dimnames = list(sites, sites))
+
+full[rownames(tri), colnames(tri)] <- tri
+full[colnames(tri), rownames(tri)] <- t(tri)
+
+full[is.na(full)] <- 1
+
+letters <- multcompLetters(full)$Letters
+letters_df <- data.frame(SiteCode = names(letters),
+                         Letter = letters)
+
+plot_df <- OregonUrch %>%
+  left_join(letters_df, by = "SiteCode")
+
+
+# if on y-axis: 
+plot_df$SiteCode <- factor(plot_df$SiteCode, levels=c("CMS", "CMN", "CP", "WC" , 
+                                                            "RP", "CB", "SC", "SB", "SH" ,
+                                                            "YB", "BB", "FC"))
+
+pl1 <- ggplot(plot_df, aes(x = SiteCode, y = OpenUrchins, fill = SiteCode)) +
   geom_boxplot(outlier.shape = NA, alpha = 0.6) +
-  stat_summary(fun = mean, geom = "point", shape = 23, size = 3, fill = "white", 
-               color = "black") +
-  # geom_jitter(width = 0.2, alpha = 0.4, color = "black") +
+  geom_text(
+    aes(label = Letter),
+    y = max(plot_df$OpenUrchins, na.rm = TRUE) * 1.01,
+    size = 6
+  ) +
+  stat_summary(fun = mean, geom = "point", shape = 23, size = 3,
+               fill = "white", color = "black") +
   labs(
     x = "Site",
     y = "Open Urchin Density (count per 0.25m²) in both subhabitats"
@@ -300,7 +344,10 @@ pl1 <- ggplot(OregonUrch, aes(x = SiteCode, y = OpenUrchins, fill = SiteCode)) +
     "CB" = "darkolivegreen4",
     "RP" = "darkolivegreen4",
     "CP" = "darkolivegreen4",
-    "WC" = "darkolivegreen4"))+
+    "WC" = "darkolivegreen4",
+    "CMN" = "lightgrey",
+    "CMS" = "lightgrey"
+  )) +
   theme_minimal() +
   theme(
     legend.position = "none",
@@ -310,6 +357,7 @@ pl1 <- ggplot(OregonUrch, aes(x = SiteCode, y = OpenUrchins, fill = SiteCode)) +
     axis.text.y = element_text(size = 15)
   ) +
   coord_flip()
+
 
 ggsave(filename = "Temp/Q3/UrchinDensitiesbySiteOpen.png", 
        plot =pl1  , width = 8, height = 6, dpi = 300)
