@@ -61,8 +61,7 @@ behav_subhab_cols <- c(
   "PittedUrchins" = "#EA4F0DFF",
   "Cryptic" = "#F1CA3AFF",
   "CreviceUrchins" = "#29EFA2FF",
-  "NonPit" = "#4490FEFF",
-  "OpenUrchins" = "purple"
+  "OpenUrchins" = "#4490FEFF"
 )
 
 View(urch)
@@ -102,21 +101,21 @@ plotdat <- OnlyUrch %>%
 
 npz_long <- NPZ %>%
   pivot_longer(
-    cols = c(PittedUrchins, CreviceUrchins, OpenUrchins, Cryptic, NonPit),
+    cols = c(PittedUrchins, CreviceUrchins, OpenUrchins),
     names_to = "Category",
     values_to = "Count"
   )
 
 upz_long <- UPZ %>%
   pivot_longer(
-    cols = c(PittedUrchins, CreviceUrchins, OpenUrchins, Cryptic, NonPit),
+    cols = c(PittedUrchins, CreviceUrchins, OpenUrchins),
     names_to = "Category",
     values_to = "Count"
   )
 
 az_long <- AZ %>%
   pivot_longer(
-    cols = c(PittedUrchins, CreviceUrchins, OpenUrchins, Cryptic, NonPit),
+    cols = c(PittedUrchins, CreviceUrchins, OpenUrchins),
     names_to = "Category",
     values_to = "Count"
   )
@@ -139,7 +138,7 @@ upz1 <- ggplot(upz_summary, aes(x = SiteCode, y = mean_count, fill = Category)) 
   ) +
   scale_fill_manual(values = behav_subhab_cols) +
   labs(
-    title = "Urchin-pit Dominated Subhabitat",
+    title = "Urchin Pit Dominated Subhabitat",
     x = "Site",
     y = "Mean Urchin Count ± SE",
     fill = "Category"
@@ -202,3 +201,86 @@ az1 <- ggplot(az_summary, aes(x = SiteCode, y = mean_count, fill = Category)) +
 
 ggsave(filename = "Figures/Surveys/Exploratory/az1.png", 
        plot =az1  , width = 8, height = 6, dpi = 300)
+
+###########
+# Tables
+################################################################################
+UPZ %>%
+  group_by(SiteCode) %>%
+  summarise(
+    MeanPitted = mean(PittedUrchins, na.rm = TRUE),
+    SEPitted   = sd(PittedUrchins, na.rm = TRUE) / sqrt(n()), 
+    MeanCrevice = mean(CreviceUrchins, na.rm = TRUE),
+    SECrevice   = sd(CreviceUrchins, na.rm = TRUE) / sqrt(n()),
+    MeanOpen = mean(OpenUrchins, na.rm = TRUE),
+    SEOpen   = sd(OpenUrchins, na.rm = TRUE) / sqrt(n())
+  ) %>%
+  mutate(
+    MeanPitted = round(MeanPitted, 1),
+    SEPitted   = round(SEPitted, 1),
+    MeanCrevice = round(MeanCrevice, 1),
+    SECrevice   = round(SECrevice, 1),
+    MeanOpen = round(MeanOpen, 1),
+    SEOpen   = round(SEOpen, 1),
+    
+    # Name the new columns
+    Pitted  = paste0(MeanPitted, " ± ", SEPitted),
+    Crevice = paste0(MeanCrevice, " ± ", SECrevice),
+    Open    = paste0(MeanOpen, " ± ", SEOpen)
+  ) %>%
+  # Keep only the columns you want in the table
+  select(SiteCode, Pitted, Crevice, Open) %>%
+  kable(
+    format = "html",
+    col.names =c("Site", "Pitted Urchin Count",
+                 "Crevice Urchin Count",
+                 "Open Urchin Count"),
+    align = c("l", "c", "c", "c")
+  ) %>%
+  kable_styling(
+    bootstrap_options = c("striped", "hover", "condensed"),
+    full_width = FALSE,
+    font_size = 14
+  ) %>%
+  row_spec(0, bold = TRUE)
+
+#############and NPZ
+
+NPZ %>%
+  group_by(SiteCode) %>%
+  summarise(
+    MeanPitted = mean(PittedUrchins, na.rm = TRUE),
+    SEPitted   = sd(PittedUrchins, na.rm = TRUE) / sqrt(n()), 
+    MeanCrevice = mean(CreviceUrchins, na.rm = TRUE),
+    SECrevice   = sd(CreviceUrchins, na.rm = TRUE) / sqrt(n()),
+    MeanOpen = mean(OpenUrchins, na.rm = TRUE),
+    SEOpen   = sd(OpenUrchins, na.rm = TRUE) / sqrt(n())
+  ) %>%
+  mutate(
+    MeanPitted = round(MeanPitted, 1),
+    SEPitted   = round(SEPitted, 1),
+    MeanCrevice = round(MeanCrevice, 1),
+    SECrevice   = round(SECrevice, 1),
+    MeanOpen = round(MeanOpen, 1),
+    SEOpen   = round(SEOpen, 1),
+    
+    # Name the new columns
+    Pitted  = paste0(MeanPitted, " ± ", SEPitted),
+    Crevice = paste0(MeanCrevice, " ± ", SECrevice),
+    Open    = paste0(MeanOpen, " ± ", SEOpen)
+  ) %>%
+  # Keep only the columns you want in the table
+  select(SiteCode, Pitted, Crevice, Open) %>%
+  kable(
+    format = "html",
+    col.names = c("Site", "Pitted Urchin Count",
+                  "Crevice Urchin Count",
+                  "Open Urchin Count"),
+    align = c("l", "c", "c", "c")
+  ) %>%
+  kable_styling(
+    bootstrap_options = c("striped", "hover", "condensed"),
+    full_width = FALSE,
+    font_size = 14
+  ) %>%
+  row_spec(0, bold = TRUE)

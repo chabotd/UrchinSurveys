@@ -89,46 +89,9 @@ OnlyUrch <- urch %>%
 #remove YB and SH
 NoPerpetua <- OnlyUrch %>%
   filter(!(SiteCode %in% c("SH", "YB")))
-################################################################################
-# Rock hardness mean and SE
-################################################################################
-rock<- read.csv("Data/RelativeRockHardness.csv")
-View(rock)
-summary(rock)
-
-rock %>%
-  group_by(Site) %>%
-  summarise(
-    Mean = mean(TimeToDrill, na.rm = TRUE),
-    SE   = sd(TimeToDrill, na.rm = TRUE) / sqrt(n()),
-    CI95_low  = Mean - 1.96 * SE,
-    CI95_high = Mean + 1.96 * SE
-  )
-
-rock %>%
-  group_by(Site) %>%
-  summarise(
-    Mean = mean(TimeToDrill, na.rm = TRUE),
-    SE   = sd(TimeToDrill, na.rm = TRUE) / sqrt(n())
-  ) %>%
-  mutate(
-    Mean = round(Mean, 2),
-    SE = round(SE, 2)
-  ) %>%
-  kable(
-    format = "html",
-    col.names = c("Site", "Mean Time to Drill (s)", "SE"),
-    align = c("l", "r", "r")
-  ) %>%
-  kable_styling(
-    bootstrap_options = c("striped", "hover", "condensed"),
-    full_width = FALSE,
-    font_size = 14
-  ) %>%
-  row_spec(0, bold = TRUE)
 
 ################################################################################
-#Q1 Kelp Abundance Diffs subhabitats
+# NEW Q2 Kelp Abundance Diffs in Subhabitats OLD (Q1)
 ################################################################################
 kruskal.test(TotalCanopy ~ Subhabitat, data = OnlyUrch)
 
@@ -147,7 +110,6 @@ q1sub <- ggplot(OnlyUrch, aes(x = Subhabitat, y = TotalCanopy, fill = SiteCode))
   geom_boxplot(outlier.shape = NA, alpha = 0.6) +
   stat_summary(fun = mean, geom = "point", shape = 23, size = 3, fill = "white", 
                color = "black") +
- #facet_wrap(~ SiteCode) +
   labs(
     x = "Subhabitat and Site",
     y = "Percent Cover of Canopy-Forming Kelp per 0.25m²"
@@ -155,175 +117,310 @@ q1sub <- ggplot(OnlyUrch, aes(x = Subhabitat, y = TotalCanopy, fill = SiteCode))
   scale_fill_manual(values = site_cols) +
   theme_minimal() +
   theme(
-    legend.position = "none",
-    axis.title.x = element_text(size = 16),
-    axis.title.y = element_text(size = 14),
-    axis.text.x = element_text(size = 15),
-    axis.text.y = element_text(size = 15)
+    legend.position = "right",
+    legend.text = element_text(size = 7),
+    legend.title = element_text(size = 9),
+    axis.title.x = element_text(size = 12),
+    axis.title.y = element_text(size = 12),
+    axis.text.x = element_text(size = 12),
+    axis.text.y = element_text(size = 12)
   ) 
 
 ggsave(filename = "Figures/Surveys/Q1_kelp_subhabitat.png", 
        plot = q1sub , width = 8, height = 6, dpi = 300)
 
 ################################################################################
-#Q1 Kelp Abundance Diffs -- urch behavior
+#Q1 Kelp Abundance Diffs -- urch behavior (could also look at understory algae)
 ################################################################################
+######## CANOPY FORMING
+#########################
+# Model 1: Cryptic
+m_cryp <- glm(
+  TotalCanopy ~ Cryptic,
+  data = OnlyUrch,
+  family = tweedie(var.power = 1.5, link.power = 0)
+)
 
-# pivot longer to get behavior 
-plotdat <- NoPerpetua %>%
+summary(m_cryp)
+# Model 2: Open
+m_open <- glm(
+  TotalCanopy ~ OpenUrchins,
+  data = OnlyUrch,
+  family = tweedie(var.power = 1.5, link.power = 0)
+)
+summary(m_open)
+
+plotdat <- OnlyUrch %>%
+  mutate(
+    PredCryp = predict(m_cryp, type = "response"),
+    PredOpen = predict(m_open, type = "response")
+  ) %>%
   pivot_longer(
     cols = c(Cryptic, OpenUrchins),
     names_to = "UrchinBehavior",
     values_to = "UrchinDensity"
+  ) %>%
+  mutate(
+    PredictedCanopy = ifelse(
+      UrchinBehavior == "Cryptic",
+      PredCryp,
+      PredOpen
+    )
   )
 
-
-glm_tweedie_cryp <- glm(TotalCanopy ~ Cryptic,
-                   data = NoPerpetua,
-                   family = tweedie(var.power = 1.5, link.power = 0))
-summary(glm_tweedie_cryp)
-
-glm_tweedie_open <- glm(TotalCanopy ~ OpenUrchins,
-                        data = NoPerpetua,
-                        family = tweedie(var.power = 1.5, link.power = 0))
-summary(glm_tweedie_open)
-
-
-NoPerpetua$PredictedCanopyCryp <- predict(glm_tweedie_cryp, type = "response")
-NoPerpetua$PredictedCanopyOpen <- predict(glm_tweedie_open, type = "response")
-
-#correlation between models?
-
-pred1 <- predict(glm_tweedie_open, type="response")
-pred2 <- predict(glm_tweedie_cryp, type="response")
-
-cor(pred1, pred2)
-
-glm3 <- glm(TotalCanopy ~ OpenUrchins + Cryptic,
-            data = OnlyUrch,
-            family = tweedie(var.power = 1.5, link.power = 0))
-
-
-####################### faceted full set up
-
-p_cryptic <- ggplot(NoPerpetua, aes(x = Cryptic, y = TotalCanopy, color = SiteCode)) +
+plot7 <- ggplot(plotdat, aes(x = UrchinDensity, y = TotalCanopy, color = UrchinBehavior)) +
   geom_point(alpha = 0.6, size = 2) +
-  geom_line(aes(y = PredictedCanopyCryp), linewidth = 1) +
-  facet_wrap(~ SiteCode) +
-  scale_color_manual(values = site_cols) +
+  geom_line(aes(y = PredictedCanopy), linewidth = 1) +
+  scale_color_manual(
+    values = c(
+      "Cryptic" = "#EA4F0DFF",
+      "OpenUrchins" = "#4490FEFF"
+    )
+  ) +
   labs(
-    x = "Cryptic Urchin Density",
+    x = "Urchin Density",
     y = "Percent Cover of Canopy-Forming Kelp per 0.25m²",
-    color = "Site"
+    color = "UrchinBehavior"
   ) +
   theme_minimal()
 
-p_noncryptic <- ggplot(NoPerpetua, aes(x = OpenUrchins, y = TotalCanopy, color = SiteCode)) +
-  geom_point(alpha = 0.6, size = 2) +
-  geom_line(aes(y = PredictedCanopyOpen), linewidth = 1) +
-  facet_wrap(~ SiteCode) +
-  scale_color_manual(values = site_cols) +
-  labs(
-    x = "Noncryptic Urchin Density",
-    y = "Percent Cover of Canopy-Forming Kelp per 0.25m²",
-    color = "Site"
-  ) +
-  theme_minimal()
-
-
-combined <- plot_grid(
-  p_cryptic,
-  p_noncryptic,
-  labels = c("A", "B"),
-  ncol = 2,
-  align = "h"
-)
 
 ggsave(filename = "Figures/Surveys/behavior_glm.png", 
-       plot =combined  , width = 8, height = 6, dpi = 300)
+       plot =plot7  , width = 8, height = 6, dpi = 300)
 
-####### Try as a loop for each indiv. plot 
+######## UNDERSTORY & play with PITTED vs cryptic 
+#############################################################################
+# these have probs
+OnlyUrch <- OnlyUrch %>%
+  filter(!Call_Number %in% c("CB_2026_UPZ_2_2", "FC_2026_UPZ_1_2"))
 
-sites <- unique(NoPerpetua$SiteCode)
+# Model 1: Pits
+m_pit <- glm(
+  UnderstoryAlgae ~ PittedUrchins,
+  data = OnlyUrch,
+  family = tweedie(var.power = 1.5, link.power = 0)
+)
+summary(m_pit)
+# Model 2: Open
+m_open <- glm(
+  UnderstoryAlgae ~ OpenUrchins,
+  data = OnlyUrch,
+  family = tweedie(var.power = 1.5, link.power = 0)
+)
+summary(m_open)
 
-plots <- lapply(sites, function(s) {
-  
-  dat <- NoPerpetua %>% filter(SiteCode == s)
-  
-  p_cryptic <- ggplot(dat, aes(x = Cryptic, y = TotalCanopy)) +
-    geom_point(alpha = 0.6, size = 2) +
-    geom_line(aes(y = PredictedCanopyCryp), linewidth = 1) +
-    labs(
-      x = "Cryptic Urchin Density",
-      y = "Percent Cover of Canopy-Forming Kelp per 0.25m²",
-      color = "Site"
-    ) +
-    theme_minimal()
-  
-  p_noncryptic <- ggplot(dat, aes(x = OpenUrchins, y = TotalCanopy)) +
-    geom_point(alpha = 0.6, size = 2) +
-    geom_line(aes(y = PredictedCanopyOpen), linewidth = 1) +
-    labs(
-      x = "Noncryptic Urchin Density",
-      y = "Percent Cover of Canopy-Forming Kelp per 0.25m²",
-      color = "Site"
-    ) +
-    theme_minimal()
-  
-  plot_grid(p_cryptic, p_noncryptic, labels = c(sites_full_names[s])
-, ncol = 2)
-    })
-
-for (i in seq_along(sites)) {
-  ggsave(
-    filename = paste0("Figures/Surveys/Q1/", sites[i], "_cryptic_noncryptic.png"),
-    plot = plots[[i]],
-    width = 10,
-    height = 5
+plotdat <- OnlyUrch %>%
+  mutate(
+    PredPits = predict(m_pit, type = "response"),
+    PredOpen = predict(m_open, type = "response")
+  ) %>%
+  pivot_longer(
+    cols = c(PittedUrchins, OpenUrchins),
+    names_to = "UrchinBehavior",
+    values_to = "UrchinDensity"
+  ) %>%
+  mutate(
+    PredictedUnderstory = ifelse(
+      UrchinBehavior == "PittedUrchins",
+      PredPits,
+      PredOpen
+    )
   )
+
+plotpit <- ggplot(plotdat, aes(x = UrchinDensity, y = UnderstoryAlgae, color = UrchinBehavior)) +
+  geom_point(alpha = 0.6, size = 2) +
+  geom_line(aes(y = PredictedUnderstory), linewidth = 1) +
+  scale_color_manual(
+    values = c(
+      "PittedUrchins" = "#EA4F0DFF",
+      "OpenUrchins" = "#4490FEFF"
+    )
+  ) +
+  labs(
+    x = "Urchin Density",
+    y = "Percent Cover of Understory Algae per 0.25m²",
+    color = "Urchin Behavior"
+  ) +
+  theme_minimal()
+
+ggsave(filename = "Figures/Surveys/behavior_glm_underpit.png", 
+       plot =plotpit  , width = 8, height = 6, dpi = 300)
+
+
+# these have probs
+OnlyUrch <- OnlyUrch %>%
+  filter(!Call_Number %in% c("CB_2026_UPZ_2_2", "FC_2026_UPZ_1_2"))
+
+# Model 1: Cryptic
+m_cryp <- glm(
+  UnderstoryAlgae ~ Cryptic,
+  data = OnlyUrch,
+  family = tweedie(var.power = 1.5, link.power = 0)
+)
+summary(m_cryp)
+
+# Model 2: Open
+m_open <- glm(
+  UnderstoryAlgae ~ OpenUrchins,
+  data = OnlyUrch,
+  family = tweedie(var.power = 1.5, link.power = 0)
+)
+summary(m_open)
+
+plotdat <- OnlyUrch %>%
+  mutate(
+    PredCryp = predict(m_cryp, type = "response"),
+    PredOpen = predict(m_open, type = "response")
+  ) %>%
+  pivot_longer(
+    cols = c(Cryptic, OpenUrchins),
+    names_to = "UrchinBehavior",
+    values_to = "UrchinDensity"
+  ) %>%
+  mutate(
+    PredictedUnderstory = ifelse(
+      UrchinBehavior == "Cryptic",
+      PredCryp,
+      PredOpen
+    )
+  )
+
+plot6 <- ggplot(plotdat, aes(x = UrchinDensity, y = UnderstoryAlgae, color = UrchinBehavior)) +
+  geom_point(alpha = 0.6, size = 2) +
+  geom_line(aes(y = PredictedUnderstory), linewidth = 1) +
+  scale_color_manual(
+    values = c(
+      "Cryptic" = "#EA4F0DFF",
+      "OpenUrchins" = "#4490FEFF"
+    )
+  ) +
+  labs(
+    x = "Urchin Density",
+    y = "Percent Cover of Understory Algae per 0.25m²",
+    color = "Urchin Behavior"
+  ) +
+  theme_minimal()
+
+
+ggsave(filename = "Figures/Surveys/behavior_glm_under.png", 
+       plot =plot6  , width = 8, height = 6, dpi = 300)
+
+################################################################################
+# New Q1: densities of cryptic / noncryptic urchins and susceptibility to migration Old Q3 
+################################################################################
+
+oneway <- aov(OpenUrchins~ SiteCode, data = OnlyUrch)
+summary(oneway)
+
+tuk <- TukeyHSD(oneway)
+
+# Extract p-values for SiteCode comparisons
+tuk_p <- tuk$SiteCode[, "p adj"]
+
+# Convert to compact letter display
+letters <- multcompLetters(tuk_p)
+letters$Letters
+
+cld_df <- data.frame(
+  SiteCode = names(letters$Letters),
+  Letters = letters$Letters
+)
+
+ggplot(OnlyUrch, aes(x = SiteCode, y = OpenUrchins)) +
+  geom_boxplot() +
+  geom_text(data = cld_df,
+            aes(x = SiteCode, y = max(OnlyUrch$OpenUrchins, na.rm = TRUE) + 2,
+                label = Letters),
+            size = 6)
+
+
+
+
+
+
+
+
+
+
+############ MAY NOT NEED
+
+#only oregon urchin dom plots
+OnlyUrch$SiteCode <- factor(OnlyUrch$SiteCode, levels=c("CMS", "CMN", "CP", "WC" , 
+                                                "RP", "CB", "SC", "SB", "SH", 
+                                               "YB", "BB", "FC"))
+
+kruskal.test(OpenUrchins~ SiteCode, data = OnlyUrch)
+# have to create matrix properly to
+
+# Megan's function 
+tri.to.squ<-function(x)
+{
+  rn<-row.names(x)
+  cn<-colnames(x)
+  an<-unique(c(cn,rn))
+  myval<-x[!is.na(x)]
+  mymat<-matrix(1,nrow=length(an),ncol=length(an),dimnames=list(an,an))
+  for(ext in 1:length(cn))
+  {
+    for(int in 1:length(rn))
+    {
+      if(is.na(x[row.names(x)==rn[int],colnames(x)==cn[ext]])) next
+      mymat[row.names(mymat)==rn[int],colnames(mymat)==cn[ext]]<-x[row.names(x)==rn[int],colnames(x)==cn[ext]]
+      mymat[row.names(mymat)==cn[ext],colnames(mymat)==rn[int]]<-x[row.names(x)==rn[int],colnames(x)==cn[ext]]
+    }
+    
+  }
+  return(mymat)
 }
 
+############################
+#NonPit Urchins
 
-################################################################################
-# Q3 : densities of cryptic / noncryptic urchins and susceptibility to migration 
-################################################################################
-#only oregon urchin dom plots
+## Kruskal Wallace test 
+kruskal.test()
+## Test is significant.
 
-#remove YB and SH, CMS and CMN and FC because all zero
-OregonUrch<- NoPerpetua %>%
-  filter(SiteCode !="FC")
-
-# if on y-axis: 
-OregonUrch$SiteCode <- factor(OregonUrch$SiteCode, levels=c("CP", "WC" , 
-                                                "RP", "CB", "SC", "SB", "BB"))
-
-kruskal.test(OpenUrchins~ SiteCode, data = OregonUrch)
-# haave to create matrix properly to
-
-pw <- pairwise.wilcox.test(
-  x = OregonUrch$OpenUrchins,
-  g = OregonUrch$SiteCode,
+## Pairwise Wilcoxin Rank Sum test for crows.
+open <- pairwise.wilcox.test(
+  x = OnlyUrch$OpenUrchins,
+  g = OnlyUrch$SiteCode,
   p.adjust.method = "fdr"
 )
 
-tri <- pw$p.value
-sites <- sort(unique(OregonUrch$SiteCode))
+## Convert the p-value output table into a matrix.
+open <- data.matrix(open$p.value)
 
-full <- matrix(NA, length(sites), length(sites),
-               dimnames = list(sites, sites))
+## Use the function to make the p-value matrix symmetrical.
+open <- tri.to.squ(open)
 
-full[rownames(tri), colnames(tri)] <- tri
-full[colnames(tri), rownames(tri)] <- t(tri)
+## Generate letters to represent significant differences in crow abundance between sites.
+open_letters <- multcompLetters(open,compare="<=", threshold=0.05, Letters=letters)
 
-full[is.na(full)] <- 1
+#NonPit Urchins
 
-letters <- multcompLetters(full)$Letters
-letters_df <- data.frame(SiteCode = names(letters),
-                         Letter = letters)
+## Kruskal Wallace test 
+kruskal.test()
+## Test is significant.
 
-plot_df <- OregonUrch %>%
-  left_join(letters_df, by = "SiteCode")
+## Pairwise Wilcoxin Rank Sum test for crows.
+open <- pairwise.wilcox.test(
+  x = OnlyUrch$OpenUrchins,
+  g = OnlyUrch$SiteCode,
+  p.adjust.method = "fdr"
+)
 
+## Convert the p-value output table into a matrix.
+open <- data.matrix(open$p.value)
+
+## Use the function to make the p-value matrix symmetrical.
+open <- tri.to.squ(open)
+
+## Generate letters to represent significant differences in crow abundance between sites.
+open_letters <- multcompLetters(open,compare="<=", threshold=0.05, Letters=letters)
+
+
+
+###################CREATE PLOT#################################################
 
 # if on y-axis: 
 plot_df$SiteCode <- factor(plot_df$SiteCode, levels=c("CMS", "CMN", "CP", "WC" , 
