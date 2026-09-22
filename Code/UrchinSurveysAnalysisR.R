@@ -326,114 +326,14 @@ cld_df <- data.frame(
   Letters = letters$Letters
 )
 
-ggplot(OnlyUrch, aes(x = SiteCode, y = OpenUrchins)) +
-  geom_boxplot() +
+# MAKE PLOT 
+
+plQ1 <- ggplot(OnlyUrch, aes(x = SiteCode, y = OpenUrchins, fill = SiteCode)) +
+  geom_boxplot(outlier.shape = NA, alpha = 0.6) +
   geom_text(data = cld_df,
             aes(x = SiteCode, y = max(OnlyUrch$OpenUrchins, na.rm = TRUE) + 2,
                 label = Letters),
-            size = 6)
-
-
-
-
-
-
-
-
-
-
-############ MAY NOT NEED
-
-#only oregon urchin dom plots
-OnlyUrch$SiteCode <- factor(OnlyUrch$SiteCode, levels=c("CMS", "CMN", "CP", "WC" , 
-                                                "RP", "CB", "SC", "SB", "SH", 
-                                               "YB", "BB", "FC"))
-
-kruskal.test(OpenUrchins~ SiteCode, data = OnlyUrch)
-# have to create matrix properly to
-
-# Megan's function 
-tri.to.squ<-function(x)
-{
-  rn<-row.names(x)
-  cn<-colnames(x)
-  an<-unique(c(cn,rn))
-  myval<-x[!is.na(x)]
-  mymat<-matrix(1,nrow=length(an),ncol=length(an),dimnames=list(an,an))
-  for(ext in 1:length(cn))
-  {
-    for(int in 1:length(rn))
-    {
-      if(is.na(x[row.names(x)==rn[int],colnames(x)==cn[ext]])) next
-      mymat[row.names(mymat)==rn[int],colnames(mymat)==cn[ext]]<-x[row.names(x)==rn[int],colnames(x)==cn[ext]]
-      mymat[row.names(mymat)==cn[ext],colnames(mymat)==rn[int]]<-x[row.names(x)==rn[int],colnames(x)==cn[ext]]
-    }
-    
-  }
-  return(mymat)
-}
-
-############################
-#NonPit Urchins
-
-## Kruskal Wallace test 
-kruskal.test()
-## Test is significant.
-
-## Pairwise Wilcoxin Rank Sum test for crows.
-open <- pairwise.wilcox.test(
-  x = OnlyUrch$OpenUrchins,
-  g = OnlyUrch$SiteCode,
-  p.adjust.method = "fdr"
-)
-
-## Convert the p-value output table into a matrix.
-open <- data.matrix(open$p.value)
-
-## Use the function to make the p-value matrix symmetrical.
-open <- tri.to.squ(open)
-
-## Generate letters to represent significant differences in crow abundance between sites.
-open_letters <- multcompLetters(open,compare="<=", threshold=0.05, Letters=letters)
-
-#NonPit Urchins
-
-## Kruskal Wallace test 
-kruskal.test()
-## Test is significant.
-
-## Pairwise Wilcoxin Rank Sum test for crows.
-open <- pairwise.wilcox.test(
-  x = OnlyUrch$OpenUrchins,
-  g = OnlyUrch$SiteCode,
-  p.adjust.method = "fdr"
-)
-
-## Convert the p-value output table into a matrix.
-open <- data.matrix(open$p.value)
-
-## Use the function to make the p-value matrix symmetrical.
-open <- tri.to.squ(open)
-
-## Generate letters to represent significant differences in crow abundance between sites.
-open_letters <- multcompLetters(open,compare="<=", threshold=0.05, Letters=letters)
-
-
-
-###################CREATE PLOT#################################################
-
-# if on y-axis: 
-plot_df$SiteCode <- factor(plot_df$SiteCode, levels=c("CMS", "CMN", "CP", "WC" , 
-                                                            "RP", "CB", "SC", "SB", "SH" ,
-                                                            "YB", "BB", "FC"))
-
-pl1 <- ggplot(plot_df, aes(x = SiteCode, y = OpenUrchins, fill = SiteCode)) +
-  geom_boxplot(outlier.shape = NA, alpha = 0.6) +
-  geom_text(
-    aes(label = Letter),
-    y = max(plot_df$OpenUrchins, na.rm = TRUE) * 1.01,
-    size = 6
-  ) +
+            size = 6) +
   stat_summary(fun = mean, geom = "point", shape = 23, size = 3,
                fill = "white", color = "black") +
   labs(
@@ -464,56 +364,45 @@ pl1 <- ggplot(plot_df, aes(x = SiteCode, y = OpenUrchins, fill = SiteCode)) +
   ) +
   coord_flip()
 
+ggsave(filename = "Figures/Surveys/Q1/UrchinDensitiesbySiteOpen.png", 
+       plot =plQ1  , width = 8, height = 6, dpi = 300)
 
-ggsave(filename = "Temp/Q3/UrchinDensitiesbySiteOpen.png", 
-       plot =pl1  , width = 8, height = 6, dpi = 300)
+################################################################################
+# NPZ
+################################################################################
+NPZ<- OnlyUrch %>%
+  filter(Subhabitat=="NPZ")
 
-#only UPZ
-OregonUPZ<- OregonUrch %>%
-  filter(Subhabitat=="UPZ")
+NPZoneway <- aov(OpenUrchins~ SiteCode, data = NPZ)
+summary(NPZoneway)
 
-kruskal.test(NonPit ~ SiteCode, data = OregonUPZ)
+NPZtuk <- TukeyHSD(NPZoneway)
 
-# haave to create matrix properly to
+# Extract p-values for SiteCode comparisons
+NPZtuk_p <- NPZtuk$SiteCode[, "p adj"]
 
-pw <- pairwise.wilcox.test(
-  x = OregonUPZ$OpenUrchins,
-  g = OregonUPZ$SiteCode,
-  p.adjust.method = "fdr"
+# Convert to compact letter display
+NPZletters <- multcompLetters(NPZtuk_p)
+NPZletters$Letters
+
+NPZcld_df <- data.frame(
+  SiteCode = names(NPZletters$Letters),
+  Letters = NPZletters$Letters
 )
 
-tri <- pw$p.value
-sites <- sort(unique(OregonUPZ$SiteCode))
+# MAKE PLOT 
 
-full <- matrix(NA, length(sites), length(sites),
-               dimnames = list(sites, sites))
-
-full[rownames(tri), colnames(tri)] <- tri
-full[colnames(tri), rownames(tri)] <- t(tri)
-
-full[is.na(full)] <- 1
-
-letters <- multcompLetters(full)$Letters
-letters_df <- data.frame(SiteCode = names(letters),
-                         Letter = letters)
-
-plot_df <- OregonUPZ %>%
-  left_join(letters_df, by = "SiteCode")
-
-
-
-pl4 <- ggplot(plot_df, aes(x = SiteCode, y = OpenUrchins, fill = SiteCode)) +
+plQ1_2 <- ggplot(NPZ, aes(x = SiteCode, y = OpenUrchins, fill = SiteCode)) +
   geom_boxplot(outlier.shape = NA, alpha = 0.6) +
-  geom_text(
-    aes(label = Letter),
-    y = max(plot_df$OpenUrchins, na.rm = TRUE) * 1.01,
-    size = 6
-  ) +
+  geom_text(data = NPZcld_df,
+            aes(x = SiteCode, y = max(NPZ$OpenUrchins, na.rm = TRUE) + 2,
+                label = Letters),
+            size = 6) +
   stat_summary(fun = mean, geom = "point", shape = 23, size = 3,
                fill = "white", color = "black") +
   labs(
     x = "Site",
-    y = "Open Urchin Density (count per 0.25m²) in Urchin Pit Dominated Subhabiat"
+    y = "Open Urchin Density (count per 0.25m²) in nonpit urchin dominated subhabitat"
   ) +
   scale_fill_manual(values = c(
     "BB" = "orange2",
@@ -528,21 +417,285 @@ pl4 <- ggplot(plot_df, aes(x = SiteCode, y = OpenUrchins, fill = SiteCode)) +
     "WC" = "darkolivegreen4",
     "CMN" = "lightgrey",
     "CMS" = "lightgrey"
-  )) +
-  theme_minimal() +
-  theme(
-    legend.position = "none",
-    axis.title.x = element_text(size = 18),
-    axis.title.y = element_text(size = 18),
-    axis.text.x = element_text(size = 15),
-    axis.text.y = element_text(size = 15)
-  ) +
+  ))+
+    theme_minimal() +
+      theme(
+        legend.position = "none",
+        axis.title.x = element_text(size = 18),
+        axis.title.y = element_text(size = 18),
+        axis.text.x = element_text(size = 15),
+        axis.text.y = element_text(size = 15)
+      ) +
+      coord_flip()
   coord_flip()
+  
+  ggsave(filename = "Figures/Surveys/Q1/OpenUrchinDensities_NPZ.png", 
+         plot =plQ1_2  , width = 8, height = 6, dpi = 300)
 
-ggsave(filename = "Temp/Q3/UrchinDensitiesbySiteOpeninUPZ.png", 
-       plot =pl4  , width = 8, height = 6, dpi = 300)
-############################
+  ################################################################################
+  # UPZ
+  ################################################################################
+  UPZ<- OnlyUrch %>%
+    filter(Subhabitat=="UPZ")
+  
+  UPZoneway <- aov(OpenUrchins~ SiteCode, data = UPZ)
+  summary(UPZoneway)
+  
+  UPZtuk <- TukeyHSD(UPZoneway)
+  
+  # Extract p-values for SiteCode comparisons
+  PZtuk_p <- UPZtuk$SiteCode[, "p adj"]
+  
+  # Convert to compact letter display
+  PZletters <- multcompLetters(PZtuk_p)
+  PZletters$Letters
+  
+  PZcld_df <- data.frame(
+    SiteCode = names(PZletters$Letters),
+    Letters = PZletters$Letters
+  )
+  
+  # MAKE PLOT 
+  
+  plQ1_3 <- ggplot(UPZ, aes(x = SiteCode, y = OpenUrchins, fill = SiteCode)) +
+    geom_boxplot(outlier.shape = NA, alpha = 0.6) +
+    geom_text(data = PZcld_df,
+              aes(x = SiteCode, y = max(NPZ$OpenUrchins, na.rm = TRUE) + 2,
+                  label = Letters),
+              size = 6) +
+    stat_summary(fun = mean, geom = "point", shape = 23, size = 3,
+                 fill = "white", color = "black") +
+    labs(
+      x = "Site",
+      y = "Open Urchin Density (count per 0.25m²) in urchin pit dominated subhabitat"
+    ) +
+    scale_fill_manual(values = c(
+      "BB" = "orange2",
+      "FC" = "orange2",
+      "SC" = "orange2",
+      "SB" = "orange2",
+      "YB" = "royalblue4",
+      "SH" = "royalblue4",
+      "CB" = "darkolivegreen4",
+      "RP" = "darkolivegreen4",
+      "CP" = "darkolivegreen4",
+      "WC" = "darkolivegreen4",
+      "CMN" = "lightgrey",
+      "CMS" = "lightgrey"
+    ))+
+    theme_minimal() +
+    theme(
+      legend.position = "none",
+      axis.title.x = element_text(size = 18),
+      axis.title.y = element_text(size = 18),
+      axis.text.x = element_text(size = 15),
+      axis.text.y = element_text(size = 15)
+    ) +
+    coord_flip()
+  
+  
+  ggsave(filename = "Figures/Surveys/Q1/OpenUrchinDensities_UPZ.png", 
+         plot =plQ1_3  , width = 8, height = 6, dpi = 300)
+  
+  # NPZ
+
+############ KRUSKAL -WALLIS  VERSION 
+# 
+# #only oregon urchin dom plots
+# OnlyUrch$SiteCode <- factor(OnlyUrch$SiteCode, levels=c("CMS", "CMN", "CP", "WC" , 
+#                                                 "RP", "CB", "SC", "SB", "SH", 
+#                                                "YB", "BB", "FC"))
+# 
+# kruskal.test(OpenUrchins~ SiteCode, data = OnlyUrch)
+# # have to create matrix properly to
+# 
+# # Megan's function 
+# tri.to.squ<-function(x)
+# {
+#   rn<-row.names(x)
+#   cn<-colnames(x)
+#   an<-unique(c(cn,rn))
+#   myval<-x[!is.na(x)]
+#   mymat<-matrix(1,nrow=length(an),ncol=length(an),dimnames=list(an,an))
+#   for(ext in 1:length(cn))
+#   {
+#     for(int in 1:length(rn))
+#     {
+#       if(is.na(x[row.names(x)==rn[int],colnames(x)==cn[ext]])) next
+#       mymat[row.names(mymat)==rn[int],colnames(mymat)==cn[ext]]<-x[row.names(x)==rn[int],colnames(x)==cn[ext]]
+#       mymat[row.names(mymat)==cn[ext],colnames(mymat)==rn[int]]<-x[row.names(x)==rn[int],colnames(x)==cn[ext]]
+#     }
+#     
+#   }
+#   return(mymat)
+# }
+# 
+# ############################
+# #NonPit Urchins
+# 
+# ## Kruskal Wallace test 
+# kruskal.test()
+# ## Test is significant.
+# 
+# ## Pairwise Wilcoxin Rank Sum test for crows.
+# open <- pairwise.wilcox.test(
+#   x = OnlyUrch$OpenUrchins,
+#   g = OnlyUrch$SiteCode,
+#   p.adjust.method = "fdr"
+# )
+# 
+# ## Convert the p-value output table into a matrix.
+# open <- data.matrix(open$p.value)
+# 
+# ## Use the function to make the p-value matrix symmetrical.
+# open <- tri.to.squ(open)
+# 
+# ## Generate letters to represent significant differences in crow abundance between sites.
+# open_letters <- multcompLetters(open,compare="<=", threshold=0.05, Letters=letters)
+# 
+# #NonPit Urchins
+# 
+# ## Kruskal Wallace test 
+# kruskal.test()
+# ## Test is significant.
+# 
+# ## Pairwise Wilcoxin Rank Sum test for crows.
+# open <- pairwise.wilcox.test(
+#   x = OnlyUrch$OpenUrchins,
+#   g = OnlyUrch$SiteCode,
+#   p.adjust.method = "fdr"
+# )
+# 
+# ## Convert the p-value output table into a matrix.
+# open <- data.matrix(open$p.value)
+# 
+# ## Use the function to make the p-value matrix symmetrical.
+# open <- tri.to.squ(open)
+# 
+# ## Generate letters to represent significant differences in crow abundance between sites.
+# open_letters <- multcompLetters(open,compare="<=", threshold=0.05, Letters=letters)
+# 
+# 
+# 
+# ###################CREATE PLOT#################################################
+# 
+# # if on y-axis: 
+# OnlyUrch$SiteCode <- factor(OnlyUrch$SiteCode, levels=c("CMS", "CMN", "CP", "WC" , 
+#                                                             "RP", "CB", "SC", "SB", "SH" ,
+#                                                             "YB", "BB", "FC"))
+# 
+# pl1 <- ggplot(OnlyUrch, aes(x = SiteCode, y = OpenUrchins, fill = SiteCode)) +
+#   geom_boxplot(outlier.shape = NA, alpha = 0.6) +
+#   stat_summary(fun = mean, geom = "point", shape = 23, size = 3,
+#                fill = "white", color = "black") +
+#   labs(
+#     x = "Site",
+#     y = "Open Urchin Density (count per 0.25m²) in both subhabitats"
+#   ) +
+#   scale_fill_manual(values = c(
+#     "BB" = "orange2",
+#     "FC" = "orange2",
+#     "SC" = "orange2",
+#     "SB" = "orange2",
+#     "YB" = "royalblue4",
+#     "SH" = "royalblue4",
+#     "CB" = "darkolivegreen4",
+#     "RP" = "darkolivegreen4",
+#     "CP" = "darkolivegreen4",
+#     "WC" = "darkolivegreen4",
+#     "CMN" = "lightgrey",
+#     "CMS" = "lightgrey"
+#   )) +
+#   theme_minimal() +
+#   theme(
+#     legend.position = "none",
+#     axis.title.x = element_text(size = 18),
+#     axis.title.y = element_text(size = 18),
+#     axis.text.x = element_text(size = 15),
+#     axis.text.y = element_text(size = 15)
+#   ) +
+#   coord_flip()
+# 
+# 
+# ggsave(filename = "Temp/Q3/UrchinDensitiesbySiteOpen.png", 
+#        plot =pl1  , width = 8, height = 6, dpi = 300)
+# 
+# #only UPZ
+# OregonUPZ<- OregonUrch %>%
+#   filter(Subhabitat=="UPZ")
+# 
+# kruskal.test(NonPit ~ SiteCode, data = OregonUPZ)
+# 
+# # haave to create matrix properly to
+# 
+# pw <- pairwise.wilcox.test(
+#   x = OregonUPZ$OpenUrchins,
+#   g = OregonUPZ$SiteCode,
+#   p.adjust.method = "fdr"
+# )
+# 
+# tri <- pw$p.value
+# sites <- sort(unique(OregonUPZ$SiteCode))
+# 
+# full <- matrix(NA, length(sites), length(sites),
+#                dimnames = list(sites, sites))
+# 
+# full[rownames(tri), colnames(tri)] <- tri
+# full[colnames(tri), rownames(tri)] <- t(tri)
+# 
+# full[is.na(full)] <- 1
+# 
+# letters <- multcompLetters(full)$Letters
+# letters_df <- data.frame(SiteCode = names(letters),
+#                          Letter = letters)
+# 
+# plot_df <- OregonUPZ %>%
+#   left_join(letters_df, by = "SiteCode")
+# 
+# 
+# 
+# pl4 <- ggplot(plot_df, aes(x = SiteCode, y = OpenUrchins, fill = SiteCode)) +
+#   geom_boxplot(outlier.shape = NA, alpha = 0.6) +
+#   geom_text(
+#     aes(label = Letter),
+#     y = max(plot_df$OpenUrchins, na.rm = TRUE) * 1.01,
+#     size = 6
+#   ) +
+#   stat_summary(fun = mean, geom = "point", shape = 23, size = 3,
+#                fill = "white", color = "black") +
+#   labs(
+#     x = "Site",
+#     y = "Open Urchin Density (count per 0.25m²) in Urchin Pit Dominated Subhabiat"
+#   ) +
+#   scale_fill_manual(values = c(
+#     "BB" = "orange2",
+#     "FC" = "orange2",
+#     "SC" = "orange2",
+#     "SB" = "orange2",
+#     "YB" = "royalblue4",
+#     "SH" = "royalblue4",
+#     "CB" = "darkolivegreen4",
+#     "RP" = "darkolivegreen4",
+#     "CP" = "darkolivegreen4",
+#     "WC" = "darkolivegreen4",
+#     "CMN" = "lightgrey",
+#     "CMS" = "lightgrey"
+#   )) +
+#   theme_minimal() +
+#   theme(
+#     legend.position = "none",
+#     axis.title.x = element_text(size = 18),
+#     axis.title.y = element_text(size = 18),
+#     axis.text.x = element_text(size = 15),
+#     axis.text.y = element_text(size = 15)
+#   ) +
+#   coord_flip()
+# 
+# ggsave(filename = "Temp/Q3/UrchinDensitiesbySiteOpeninUPZ.png", 
+#        plot =pl4  , width = 8, height = 6, dpi = 300)
+###############################################################################
 #only UPZ
+###############################################################################
 OregonNPZ<- OregonUrch %>%
   filter(Subhabitat=="NPZ")
 
