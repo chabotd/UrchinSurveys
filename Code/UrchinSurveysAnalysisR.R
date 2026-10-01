@@ -70,28 +70,66 @@ connect <- c(
   "WC" = "darkolivegreen4")
 
 susept <- c(
-  "BB" = "cornflowerblue",
-  "FC" = "cornflowerblue",
-  "SC" = "cornflowerblue",
-  "SB" = "cornflowerblue",
-  "YB" = "grey3",
-  "SH" = "grey3",
-  "CB" = "tomato2",
-  "RP" = "tomato2",
-  "CP" = "tomato2",
-  "WC" = "tomato2")
+  "Unlikely" = "cornflowerblue",
+  "Extremely Unlikely" = "grey3",
+  "Susceptible" = "tomato2")
+
 View(urch)
 
 # don't look at AZ-- urchin-dominated zones only. 
 OnlyUrch <- urch %>%
   filter(Subhabitat %in% c("UPZ", "NPZ"))
 
-#remove YB and SH
-NoPerpetua <- OnlyUrch %>%
-  filter(!(SiteCode %in% c("SH", "YB")))
+#remove Mendo
+oregon <- OnlyUrch %>%
+  filter(!(SiteCode %in% c("CMS", "CMN")))
+
+
+##############################################################################
+#Q1 FIG 1 - overall unlikley vs susept open urch diffs
+##############################################################################
+kruskal.test(OpenUrchins ~ Connectivity, data = oregon)
+
+# can I do pairwise?
+pairwise.wilcox.test(
+  x = oregon$OpenUrchins,
+  g = oregon$Connectivity,
+  p.adjust.method = "fdr"
+)
+
+pl3 <- ggplot(oregon, aes(x = Connectivity, y = NonPit, fill= Connectivity)) +
+  geom_boxplot(outlier.shape = NA, alpha = 0.6) +
+  geom_jitter(width = 0.2, alpha = 0.4, color = "black") +
+  labs(
+    x = "Urchin Migration Possibility",
+    y = "Noncryptic Urchin Density (count per 0.25m²)"
+  ) +
+  scale_fill_manual(values = susept) +
+  theme_minimal() +
+  theme(
+    legend.position = "none",
+    axis.title.x = element_text(size = 18),
+    axis.title.y = element_text(size = 18),
+    axis.text.x = element_text(size = 15),
+    axis.text.y = element_text(size = 15)
+  ) +
+  coord_flip()
+
+
+ggsave(filename = "Figures/Surveys/Q1/UrchinDensitiesbyConnectivityOpen.png", 
+       plot =pl3  , width = 8, height = 6, dpi = 300)
+
+##############################################################################
+#Q1 FIG 2 - overall sitewide open urchin densities 
+##############################################################################
+
+oregon$SiteCode <- factor(oregon$SiteCode, levels=c("CP", "WC" , 
+                                                    "RP", "CB", "SC", "SB", 
+                                                    "SH", "YB", "BB", "FC"))
+
 
 ################################################################################
-# NEW Q2 Kelp Abundance Diffs in Subhabitats OLD (Q1)
+# Q2 Kelp Abundance Diffs in Subhabitats 
 ################################################################################
 kruskal.test(TotalCanopy ~ Subhabitat, data = OnlyUrch)
 
@@ -130,18 +168,20 @@ ggsave(filename = "Figures/Surveys/Q1_kelp_subhabitat.png",
        plot = q1sub , width = 8, height = 6, dpi = 300)
 
 ################################################################################
-#Q1 Kelp Abundance Diffs -- urch behavior (could also look at understory algae)
+#Q3 Kelp Abundance Diffs
+#  -- Urchin behavior and kelp
 ################################################################################
-######## CANOPY FORMING
+######## FIG 6 CANOPY FORMING
 #########################
+
 # Model 1: Cryptic
 m_cryp <- glm(
   TotalCanopy ~ Cryptic,
   data = OnlyUrch,
   family = tweedie(var.power = 1.5, link.power = 0)
 )
-
 summary(m_cryp)
+
 # Model 2: Open
 m_open <- glm(
   TotalCanopy ~ OpenUrchins,
@@ -149,6 +189,7 @@ m_open <- glm(
   family = tweedie(var.power = 1.5, link.power = 0)
 )
 summary(m_open)
+
 
 plotdat <- OnlyUrch %>%
   mutate(
@@ -162,7 +203,7 @@ plotdat <- OnlyUrch %>%
   ) %>%
   mutate(
     PredictedCanopy = ifelse(
-      UrchinBehavior == "Cryptic",
+      UrchinBehavior == "Cryptic", 
       PredCryp,
       PredOpen
     )
@@ -184,26 +225,33 @@ plot7 <- ggplot(plotdat, aes(x = UrchinDensity, y = TotalCanopy, color = UrchinB
   ) +
   theme_minimal()
 
+######### ANCOVA on model
 
-ggsave(filename = "Figures/Surveys/behavior_glm.png", 
-       plot =plot7  , width = 8, height = 6, dpi = 300)
+ancova_fit <- aov(TotalCanopy ~ UrchinDensity + UrchinBehavior, data = plotdat)
+summary(ancova_fit)
 
-######## UNDERSTORY & play with PITTED vs cryptic 
-#############################################################################
-# these have probs
+
+###########         #################     ###############     ############
+#try log transforming
+##########        ##############              #############################
 OnlyUrch <- OnlyUrch %>%
-  filter(!Call_Number %in% c("CB_2026_UPZ_2_2", "FC_2026_UPZ_1_2"))
+  mutate(
+    logCryptic = log1p(Cryptic),
+    logOpenUrchins = log1p(OpenUrchins),
+    logCanopy = log1p(TotalCanopy)
+  )
 
-# Model 1: Pits
-m_pit <- glm(
-  UnderstoryAlgae ~ PittedUrchins,
+# Model 1: Cryptic
+m_cryp <- glm(
+  logCanopy ~ logCryptic,
   data = OnlyUrch,
   family = tweedie(var.power = 1.5, link.power = 0)
 )
-summary(m_pit)
+summary(m_cryp)
+
 # Model 2: Open
 m_open <- glm(
-  UnderstoryAlgae ~ OpenUrchins,
+  logCanopy ~ logOpenUrchins,
   data = OnlyUrch,
   family = tweedie(var.power = 1.5, link.power = 0)
 )
@@ -211,11 +259,94 @@ summary(m_open)
 
 plotdat <- OnlyUrch %>%
   mutate(
-    PredPits = predict(m_pit, type = "response"),
+    PredCryp = predict(m_cryp, type = "response"),
     PredOpen = predict(m_open, type = "response")
   ) %>%
   pivot_longer(
-    cols = c(PittedUrchins, OpenUrchins),
+    cols = c(logCryptic, logOpenUrchins),
+    names_to = "UrchinBehavior",
+    values_to = "UrchinDensity"
+  ) %>%
+  mutate(
+    UrchinBehavior = ifelse(
+      UrchinBehavior == "logCryptic",
+      "Cryptic",
+      "OpenUrchins"
+    ),
+    PredictedCanopy = ifelse(
+      UrchinBehavior == "Cryptic",
+      PredCryp,
+      PredOpen
+    )
+  )
+
+plot8 <- ggplot(plotdat, aes(x = UrchinDensity, y = logCanopy, color = UrchinBehavior)) +
+  geom_point(alpha = 0.6, size = 2) +
+  geom_line(aes(y = PredictedCanopy), linewidth = 1) +
+  scale_color_manual(
+    values = c(
+      "Cryptic" = "#EA4F0DFF",
+      "OpenUrchins" = "#4490FEFF"
+    )
+  ) +
+  labs(
+    x = "log Urchin Density",
+    y = "log Percent Cover of Canopy-Forming Kelp per 0.25m²",
+    color = "UrchinBehavior"
+  ) +
+  theme_minimal()
+
+ggsave(filename = "Figures/Surveys/behavior_glm_log.png", 
+       plot =plot8  , width = 8, height = 6, dpi = 300)
+
+
+
+######### ANCOVA on log model
+
+ancova_fit <- aov(logCanopy ~ UrchinDensity +UrchinBehavior, data = plotdat)
+summary(ancova_fit)
+
+# look at residuals 
+resid_vals <- residuals(ancova_fit)
+shapiro.test(resid_vals)
+
+# qq plot 
+qqnorm(resid_vals); qqline(resid_vals)
+
+######## UNDERSTORY + substrate covariate 
+#############################################################################
+# these have probs
+OnlyUrch <- OnlyUrch %>%
+  filter(!Call_Number %in% c("CB_2026_UPZ_2_2", "FC_2026_UPZ_1_2"))
+
+############################################################################
+# Pits versus Nonpits - nonlog 
+##########################
+# Model 1: Pits
+m_pit <- glm(
+  UnderstoryAlgae ~ PittedUrchins,
+  data = OnlyUrch,
+  family = tweedie(var.power = 1.5, link.power = 0)
+)
+summary(m_pit)
+# not significant
+
+# Model 2: Nonpit
+m_nonpit <- glm(
+  UnderstoryAlgae ~ NonPit,
+  data = OnlyUrch,
+  family = tweedie(var.power = 1.5, link.power = 0)
+)
+summary(m_nonpit)
+# significant 
+
+plotdat <- OnlyUrch %>%
+  mutate(
+    PredPits = predict(m_pit, type = "response"),
+    PredNonpit = predict(m_nonpit, type = "response")
+  ) %>%
+  pivot_longer(
+    cols = c(PittedUrchins, NonPit),
     names_to = "UrchinBehavior",
     values_to = "UrchinDensity"
   ) %>%
@@ -223,7 +354,7 @@ plotdat <- OnlyUrch %>%
     PredictedUnderstory = ifelse(
       UrchinBehavior == "PittedUrchins",
       PredPits,
-      PredOpen
+      PredNonpit
     )
   )
 
@@ -232,8 +363,8 @@ plotpit <- ggplot(plotdat, aes(x = UrchinDensity, y = UnderstoryAlgae, color = U
   geom_line(aes(y = PredictedUnderstory), linewidth = 1) +
   scale_color_manual(
     values = c(
-      "PittedUrchins" = "#EA4F0DFF",
-      "OpenUrchins" = "#4490FEFF"
+      "PittedUrchins" = "orange",
+      "NonPit" = "cornflowerblue"
     )
   ) +
   labs(
@@ -246,10 +377,109 @@ plotpit <- ggplot(plotdat, aes(x = UrchinDensity, y = UnderstoryAlgae, color = U
 ggsave(filename = "Figures/Surveys/behavior_glm_underpit.png", 
        plot =plotpit  , width = 8, height = 6, dpi = 300)
 
+######### ANCOVA on non log
 
-# these have probs
+ancova_fit <- aov(UnderstoryAlgae ~ UrchinDensity + UrchinBehavior, data = plotdat)
+summary(ancova_fit)
+
+resid_vals <- residuals(ancova_fit)
+shapiro.test(resid_vals)
+
+#not normal at all red flag
+
+#significant for density but not behavior
+# need to add in substrate to model 
+
+# Pits versus Nonpits - log transformation 
+##########################
+
 OnlyUrch <- OnlyUrch %>%
-  filter(!Call_Number %in% c("CB_2026_UPZ_2_2", "FC_2026_UPZ_1_2"))
+  mutate(
+    logPitted = log1p(PittedUrchins),
+    logNonpit = log1p(NonPit),
+    logUnderstory = log1p(UnderstoryAlgae)
+  )
+
+# Model 1: Pits
+m_pit <- glm(
+  logUnderstory ~ logPitted,
+  data = OnlyUrch,
+  family = tweedie(var.power = 1.5, link.power = 0)
+)
+summary(m_pit)
+# significant 
+
+# Model 2: Nonpit
+m_nonpit <- glm(
+  logUnderstory ~ logNonpit,
+  data = OnlyUrch,
+  family = tweedie(var.power = 1.5, link.power = 0)
+)
+summary(m_nonpit)
+
+#significant 
+
+plotdat_pit <- OnlyUrch %>%
+  mutate(
+    PredPit = predict(m_pit, type = "response"),
+    PredNonpit = predict(m_nonpit, type = "response")
+  ) %>%
+  pivot_longer(
+    cols = c(logPitted, logNonpit),
+    names_to = "UrchinBehavior",
+    values_to = "UrchinDensity"
+  ) %>%
+  mutate(
+    UrchinBehavior = ifelse(
+      UrchinBehavior == "logPitted",
+      "Pitted",
+      "Nonpitted"
+    ),
+    PredictedUnderstory = ifelse(
+      UrchinBehavior == "Pitted",
+      PredPit,
+      PredNonpit
+    )
+  )
+
+
+plotpit <- ggplot(plotdat_pit, aes(x = UrchinDensity, y = logUnderstory, color = UrchinBehavior)) +
+  geom_point(alpha = 0.6, size = 2) +
+  geom_line(aes(y = PredictedUnderstory), linewidth = 1) +
+  scale_color_manual(
+    values = c(
+      "Pitted" = "orange",
+      "Nonpitted" = "cornflowerblue"
+    )
+  ) +
+  labs(
+    x = "log Urchin Density",
+    y = "log Percent Cover of Understory Algae per 0.25m²",
+    color = "Urchin Behavior"
+  ) +
+  theme_minimal()
+
+ggsave(filename = "Figures/Surveys/behavior_glm_underpit.png", 
+       plot =plotpit  , width = 8, height = 6, dpi = 300)
+
+
+ancova_fit <- aov(logUnderstory ~ UrchinDensity + UrchinBehavior, data = plotdat_pit)
+summary(ancova_fit)
+
+# sg for density; not significant for behavior
+
+# look at residuals 
+resid_vals <- residuals(ancova_fit)
+shapiro.test(resid_vals)
+
+# qq plot 
+qqnorm(resid_vals); qqline(resid_vals)
+
+# assumption violated !!
+
+##################Cryptic vs Noncrpytic 
+#########non-log 
+#################################################################
 
 # Model 1: Cryptic
 m_cryp <- glm(
@@ -308,9 +538,16 @@ ggsave(filename = "Figures/Surveys/behavior_glm_under.png",
 ################################################################################
 # New Q1: densities of cryptic / noncryptic urchins and susceptibility to migration Old Q3 
 ################################################################################
-
 oneway <- aov(OpenUrchins~ SiteCode, data = OnlyUrch)
 summary(oneway)
+
+# look at residuals 
+resid_vals <- residuals(oneway)
+shapiro.test(resid_vals)
+
+# qq plot 
+qqnorm(resid_vals); qqline(resid_vals)
+
 
 tuk <- TukeyHSD(oneway)
 
@@ -435,7 +672,7 @@ plQ1_2 <- ggplot(NPZ, aes(x = SiteCode, y = OpenUrchins, fill = SiteCode)) +
   ################################################################################
   # UPZ
   ################################################################################
-  UPZ<- OnlyUrch %>%
+  UPZ<- oregon %>%
     filter(Subhabitat=="UPZ")
   
   UPZoneway <- aov(OpenUrchins~ SiteCode, data = UPZ)
@@ -479,9 +716,7 @@ plQ1_2 <- ggplot(NPZ, aes(x = SiteCode, y = OpenUrchins, fill = SiteCode)) +
       "CB" = "darkolivegreen4",
       "RP" = "darkolivegreen4",
       "CP" = "darkolivegreen4",
-      "WC" = "darkolivegreen4",
-      "CMN" = "lightgrey",
-      "CMS" = "lightgrey"
+      "WC" = "darkolivegreen4"
     ))+
     theme_minimal() +
     theme(
@@ -696,7 +931,7 @@ plQ1_2 <- ggplot(NPZ, aes(x = SiteCode, y = OpenUrchins, fill = SiteCode)) +
 ###############################################################################
 #only UPZ
 ###############################################################################
-OregonNPZ<- OregonUrch %>%
+OregonNPZ<- oregon %>%
   filter(Subhabitat=="NPZ")
 
 kruskal.test(NonPit ~ SiteCode, data = OregonNPZ)
@@ -768,35 +1003,3 @@ pl5 <- ggplot(plot_df, aes(x = SiteCode, y = OpenUrchins, fill = SiteCode)) +
 
 ggsave(filename = "Temp/Q3/UrchinDensitiesbySiteOpeninNPZ.png", 
        plot =pl5  , width = 8, height = 6, dpi = 300)
-
-############################
-kruskal.test(OpenUrchins ~ Connectivity, data = OregonUrch)
-
-# can I do pairwise?
-pairwise.wilcox.test(
-  x = OregonUrch$OpenUrchins,
-  g = OregonUrch$Connectivity,
-  p.adjust.method = "fdr"
-)
-
-pl3 <- ggplot(OregonUrch, aes(x = Connectivity, y = NonPit, fill= Connectivity)) +
-  geom_boxplot(outlier.shape = NA, alpha = 0.6) +
-  geom_jitter(width = 0.2, alpha = 0.4, color = "black") +
-  labs(
-    x = "Urchin Migration Possibility",
-    y = "Non- Cryptic Urchin Density (count per 0.25m²)"
-  ) +
-  scale_color_manual(values = connect) +
-  theme_minimal() +
-  theme(
-    legend.position = "none",
-    axis.title.x = element_text(size = 18),
-    axis.title.y = element_text(size = 18),
-    axis.text.x = element_text(size = 15),
-    axis.text.y = element_text(size = 15)
-  ) +
-  coord_flip()
-
-
-ggsave(filename = "Temp/Q3/UrchinDensitiesbyConnectivityOpen.png", 
-       plot =pl3  , width = 8, height = 6, dpi = 300)

@@ -76,6 +76,9 @@ df <- df %>%
 
  df <- df %>%
    filter(SiteCode %in% c("FC", "BB", "CB", "CBN", "RP", "YB", "SH", "CMEN", "CMES"))
+ 
+ df <- df %>%
+   filter(!Year =="2007")
 
  df <- df %>%
    rename(UrchinCount = `Strongylocentrotus purpuratus`)
@@ -93,12 +96,17 @@ df <- df %>%
      Year >= 2022 & Year <= 2026 ~ "2022–2026",
      TRUE ~ NA_character_
    ))
+ 
+ df <- df %>%
+   mutate(
+     YearGroupShort = gsub("^20([0-9]{2})–20([0-9]{2})$", "\\1–\\2", YearGroup)
+   )
+ 
 
  write.csv(df, file= "Data/UrchComData.csv", row.names = FALSE)
-
-# playing with regression
-# BB
-
+###############################################################################
+ # MAIN FIGS
+ ##############################################################################
  df <- read.csv("Data/UrchComData.csv")
  
  df <- df %>%
@@ -132,311 +140,37 @@ df <- df %>%
    "CMN" = "#BE2102FF",
    "CMS" = "#7A0403FF"
  )
+
+
+###############################################################################
+# Mean urchin count by 5 year group and site
+###############################################################################
+ plot1dat <- df %>%
+   group_by(SiteCode, YearGroupShort) %>%
+   summarise(
+     mean_urch = mean(UrchinCount, na.rm = TRUE),
+     sd_urch   = sd(UrchinCount, na.rm = TRUE),
+     n           = sum(!is.na(UrchinCount)),
+     se_urch   = sd_urch / sqrt(n),
+     .groups = "drop"
+   )
  
-# 
-# BB_df<- df %>%
-#   filter(SiteCode %in% c("BB"))
-# 
-# lm_urch <- lm(logUrchins ~ Year, data = BB_df)
-# anova(lm_urch)
-# 
-# ggplot(BB_df, aes(x = Year, y = logUrchins)) +
-#     geom_point() +
-#     stat_smooth(method = 'lm', se = FALSE, color = 'orange3') +
-#     labs(title = 'Urchin Count BB by Year',
-#          x = 'Year', y = 'Log Urchins')
-# 
-# # CBN 
-# # look at CB + add
-# 
-# CB_df<- df %>%
-#   filter(SiteCode %in% c("CB"))
-# 
-# lm_urch <- lm(logUrchins ~ Year, data = CB_df)
-# anova(lm_urch)
-# 
-# ggplot(CB_df, aes(x = Year, y = logUrchins)) +
-#   geom_point() +
-#   stat_smooth(method = 'lm', se = FALSE, color = 'blue') +
-#   labs(title = 'Urchin Count CB by Year',
-#        x = 'Year', y = 'Log Urchins')
-# 
-# #FC 
-# FC_df<- df %>%
-#   filter(SiteCode %in% c("FC"))
-# 
-# lm_urch <- lm(logUrchins ~ Year, data = FC_df)
-# anova(lm_urch)
-# 
-# ggplot(FC_df, aes(x = Year, y = logUrchins)) +
-#   geom_point() +
-#   stat_smooth(method = 'lm', se = FALSE, color = 'purple') +
-#   labs(title = 'Urchin Count FC by Year',
-#        x = 'Year', y = 'Log Urchins')
-# 
-# # RP
-# 
-# RP_df<- df %>%
-#   filter(SiteCode %in% c("RP"))
-# 
-# lm_urch <- lm(logUrchins ~ Year, data = RP_df)
-# glm(formula = logUrchins ~ Year, family = "poisson", data = RP_df)
-# anova(lm_urch)
-# 
-# ggplot(RP_df, aes(x = Year, y = logUrchins)) +
-#   geom_point() +
-#   stat_smooth(method = 'lm', se = FALSE, color = 'red') +
-#   labs(title = 'Urchin Count RP by Year',
-#        x = 'Year', y = 'Log Urchins')
-
-########################################### 
-# GLM: Tweedie
-###########################################
-RP_df<- df %>%
-  filter(SiteCode %in% c("RP"))
-glm <- glm(UrchinCount ~ Year,
-                        data = RP_df,
-                        family = tweedie(var.power = 1.5, link.power = 0))
-summary(glm)
-
-
-RP_df$PredictedUrchins <- predict(glm, type = "response")
-
-
-RP <- ggplot(RP_df, aes(x = Year, y = UrchinCount)) +
-  geom_point(alpha = 0.6, size = 2) +
-  geom_line(aes(y = PredictedUrchins), linewidth= 1, color='red') +
-  labs(title = 'Rocky Point',
-    x = "Year",
-    y = "Urchin Count",
-  ) +
-  theme_minimal()
-
-
-ggsave(filename = "Figures/CommunitySurveys/RP.png", 
-       plot = RP , width = 8, height = 6, dpi = 300)
-
-# CB trying linear and quadratic models on each: 
-#linear
- CB_df<- df %>%
-   filter(SiteCode %in% c("CBN", "CB"))
-# 
-# glm <- glm(UrchinCount ~ Year,
-#            data = CB_df,
-#            family = tweedie(var.power = 1.5, link.power = 0))
-# summary(glm)
-# 
-# CB_df$PredictedUrchins <- predict(glm, type = "response")
-
-#quad
-glm_quad <- glm(
-  UrchinCount ~ Year + I(Year^2),
-  data = CB_df,
-  family = tweedie(var.power = 1.5, link.power = 0)
-)
-
-summary(glm_quad)
-CB_df$PredictedUrchins <- predict(glm_quad, type = "response")
-
-#test difs :
-#anova(glm, glm_quad, test = "Chisq")
-
-
-CB <- ggplot(CB_df, aes(x = Year, y = UrchinCount)) +
-  geom_point(alpha = 0.6, size = 2) +
-  geom_line(aes(y = PredictedUrchins), linewidth= 1, color='purple') +
-  labs(title = 'Cape Blanco',
-    x = "Year",
-    y = "Urchin Count",
-  ) +
-  theme_minimal()
-
-ggsave(filename = "Figures/CommunitySurveys/CB.png", 
-       plot = CB , width = 8, height = 6, dpi = 300)
-
-# BB
-BB_df<- df %>%
-  filter(SiteCode %in% c("BB"))
-
-glm <- glm(UrchinCount ~ Year,
-           data = BB_df,
-           family = tweedie(var.power = 1.5, link.power = 0))
-summary(glm)
-
-
-BB_df$PredictedUrchins <- predict(glm, type = "response")
-
-#quad
-
-glm_quad <- glm(UrchinCount ~ Year + I(Year^2),
-           data = BB_df,
-           family = tweedie(var.power = 1.5, link.power = 0))
-summary(glm_quad)
-
-anova(glm, glm_quad, test = "Chisq")
-
-
-BB_df$PredictedUrchins <- predict(glm, type = "response")
-
-BB_df$PredictedUrchins <- predict(glm_quad, type = "response")
-
-
-BB <- ggplot(BB_df, aes(x = Year, y = UrchinCount)) +
-  geom_point(alpha = 0.6, size = 2) +
-  geom_line(aes(y = PredictedUrchins), linewidth= 1, color='green4') +
-  labs(title = 'Boiler Bay',
-    x = "Year",
-    y = "Urchin Count",
-  ) +
-  theme_minimal()
-
-ggsave(filename = "Figures/CommunitySurveys/BB.png", 
-       plot = BB , width = 8, height = 6, dpi = 300)
-
-# FC
-FC_df<- df %>%
-  filter(SiteCode %in% c("FC"))
-
-glm <- glm(UrchinCount ~ Year,
-           data = FC_df,
-           family = tweedie(var.power = 1.5, link.power = 0))
-summary(glm)
-
-
-FC_df$PredictedUrchins <- predict(glm, type = "response")
-
-
-FC <- ggplot(FC_df, aes(x = Year, y = UrchinCount)) +
-  geom_point(alpha = 0.6, size = 2) +
-  geom_line(aes(y = PredictedUrchins), linewidth= 1, color='blue3') +
-  labs(title = 'Fogarty Creek',
-    x = "Year",
-    y = "Urchin Count",
-  ) +
-  theme_minimal()
-
-ggsave(filename = "Figures/CommunitySurveys/FC.png", 
-       plot = FC , width = 8, height = 6, dpi = 300)
-
-plot5<- df %>%
-  group_by(YearGroup) %>%
-  summarise(MeanUrchins = mean(UrchinCount, na.rm = TRUE)) %>%
-  ggplot(aes(x = YearGroup, y = MeanUrchins)) +
-  geom_col(fill = "purple", alpha = 0.7) +
-  geom_text(aes(label = round(MeanUrchins, 1)), vjust = -0.5) +
-  labs(
-    title = "Mean Urchin Count by 5-Year Group",
-    x = "5-Year Group",
-    y = "Mean Urchin Count"
-  ) +
-  theme_minimal()
-
-
-# SH
-SH_df<- df %>%
-  filter(SiteCode %in% c("SH"))
-
-glm <- glm(UrchinCount ~ Year,
-           data = SH_df,
-           family = tweedie(var.power = 1.5, link.power = 0))
-summary(glm)
-
-
-SH_df$PredictedUrchins <- predict(glm, type = "response")
-
-
-SH <- ggplot(SH_df, aes(x = Year, y = UrchinCount)) +
-  geom_point(alpha = 0.6, size = 2) +
-  geom_line(aes(y = PredictedUrchins), linewidth= 1, color='pink') +
-  labs(title = 'Strawberry Hill',
-       x = "Year",
-       y = "Urchin Count",
-  ) +
-  theme_minimal()
-
-ggsave(filename = "Figures/CommunitySurveys/SH.png", 
-       plot = SH , width = 8, height = 6, dpi = 300)
-
-# YB
-YB_df<- df %>%
-  filter(SiteCode %in% c("YB"))
-
-glm <- glm(UrchinCount ~ Year,
-           data = YB_df,
-           family = tweedie(var.power = 1.5, link.power = 0))
-summary(glm)
-
-
-YB_df$PredictedUrchins <- predict(glm, type = "response")
-
-
-YB <- ggplot(YB_df, aes(x = Year, y = UrchinCount)) +
-  geom_point(alpha = 0.6, size = 2) +
-  geom_line(aes(y = PredictedUrchins), linewidth= 1, color='orange') +
-  labs(title = 'Yachats Beach',
-       x = "Year",
-       y = "Urchin Count",
-  ) +
-  theme_minimal()
-
-ggsave(filename = "Figures/CommunitySurveys/YB.png", 
-       plot = YB , width = 8, height = 6, dpi = 300)
-
-
-###############################################################################
-#Overall patterns by year -- what are urchins and kelp doing
-###############################################################################
-violin_plot <- ggplot(df, aes(x = Year, y = UrchinCount, fill = SiteCode)) +
-  geom_violin(alpha = 0.6) +
-  geom_vline(xintercept = 2014, linetype = "dotted", color = "black", size = 1) +
-  facet_wrap(~ SiteCode) +
-  labs(
-    title = "Urchin Count Distribution by Site Across Years",
-    x = "Year",
-    y = "Urchin Count"
-  ) +
-  theme_minimal()
-
-
-ggsave(filename = "Figures/CommunitySurveys/violin.png", 
-       plot = violin_plot , width = 8, height = 6, dpi = 300)
-
-
-#try this 
-ggplot(df, aes(x = UrchinCount, y = factor(Year), fill = SiteCode)) +
-  geom_density_ridges(alpha = 0.7) +
-  labs(
-    title = "Urchin Count Density by Year and Site",
-    x = "Urchin Count",
-    y = "Year"
-  ) +
-  theme_minimal()
-
-ggplot(df, aes(x = Total_Canopy_Forming, y = factor(Year), fill = SiteCode)) +
-  geom_density_ridges(alpha = 0.7) +
-  labs(
-    title = "Kelp Count Density by Year and Site",
-    x = "Kelp Count",
-    y = "Year"
-  ) +
-  theme_minimal()
-
-
-#################################################### 
-# works well 
-#################################################### 
-plot <- df %>%
-  group_by(SiteCode, YearGroup) %>%
-  summarise(MeanUrchins = mean(UrchinCount, na.rm = TRUE), .groups = "drop") %>%
-  ggplot(aes(x = YearGroup, y = MeanUrchins)) +
+plot <- plot1dat %>%
+  group_by(SiteCode, YearGroupShort) %>%
+  ggplot(aes(x = YearGroupShort, y = mean_urch)) +
   geom_col(aes(fill = SiteCode), alpha = 0.7)+
- # geom_text(aes(label = round(MeanUrchins, 1)), vjust = -0.5) +
+  geom_errorbar(
+    aes(ymin = mean_urch - se_urch,
+        ymax = mean_urch + se_urch
+    ),  
+    position = position_dodge(width = 0.8),
+    width = 0.2
+  ) +
   facet_wrap(~ SiteCode) +
   scale_fill_manual(values = site_cols) +
   labs(
-    title = "Mean Urchin Count by 5-Year Group and Site",
     x = "5-Year Group",
-    y = "Mean Urchin Density per "
+    y = "Mean Urchin Density per 0.25m²"
   ) +
   theme_minimal()
 
@@ -444,15 +178,31 @@ ggsave(filename = "Figures/CommunitySurveys/SitewideTotals.png",
        plot = plot , width = 8, height = 6, dpi = 300)
 
 # and for kelp 
-plot2 <- df %>%
-  group_by(SiteCode, YearGroup) %>%
-  summarise(Total_Canopy_Forming = mean(Total_Canopy_Forming, na.rm = TRUE), .groups = "drop") %>%
-  ggplot(aes(x = YearGroup, y = Total_Canopy_Forming)) +
+
+plot2dat <- df %>%
+  group_by(SiteCode, YearGroupShort) %>%
+  summarise(
+    mean_canopy = mean(Total_Canopy_Forming, na.rm = TRUE),
+    sd_canopy   = sd(Total_Canopy_Forming, na.rm = TRUE),
+    n           = sum(!is.na(Total_Canopy_Forming)),
+    se_canopy   = sd_canopy / sqrt(n),
+    .groups = "drop"
+  )
+
+plot2 <- plot2dat %>%
+  group_by(SiteCode, YearGroupShort) %>%
+  ggplot(aes(x = YearGroupShort, y = mean_canopy)) +
   geom_col(aes(fill = SiteCode), alpha = 0.7)+
+  geom_errorbar(
+    aes(ymin = mean_canopy - se_canopy,
+        ymax = mean_canopy + se_canopy
+    ),
+    position = position_dodge(width = 0.8),
+    width = 0.2
+  ) +
   facet_wrap(~ SiteCode) +
   scale_fill_manual(values = site_cols) +
   labs(
-    title = "Mean Canopy Forming Kelp by 5-Year Group and Site",
     x = "5-Year Group",
     y = "Mean Canopy Forming Kelp Percent Cover per 0.25m²"
   ) +
@@ -508,11 +258,18 @@ df %>%
 mean_urch <- df %>%
   group_by(YearGroup) %>%
   summarise(MeanUrchins = mean(UrchinCount, na.rm = TRUE)) %>%
+  left_join(df_leters, by = "YearGroup") %>%
   ggplot(aes(x = YearGroup, y = MeanUrchins)) +
   geom_col(fill = "mediumorchid4", alpha = 0.7) +
   geom_text(aes(label = round(MeanUrchins, 1)), vjust = -0.5) +
+  geom_text(
+    aes(
+      y = MeanUrchins + 2,   # place letters slightly above the bar
+      label = Letters
+    ),
+    size = 6
+  ) +
   labs(
-    title = "Mean Urchin Densities at all Sites",
     x = "5-Year Group",
     y = "Mean Urchin Density per 0.25m²"
   ) +
@@ -521,15 +278,76 @@ mean_urch <- df %>%
 ggsave(filename = "Figures/CommunitySurveys/allsites.png", 
        plot = mean_urch , width = 8, height = 6, dpi = 300)
 
+# quick anova 
+urch_aov <- aov(UrchinCount ~ YearGroup, data = df)
+summary(urch_aov)
+
+urchtuk <- TukeyHSD(urch_aov)
+
+# Extract p-values for Year Group comparisons
+urch_p <-urchtuk$YearGroup[, "p adj"]
+
+# Convert to compact letter display
+letters <- multcompLetters(urch_p)
+letters$Letters
+
+df_leters <- data.frame(
+  YearGroup = names(letters$Letters),
+  Letters = letters$Letters
+)
+
+
+mean_kelp_yeargr <- df %>%
+  group_by(YearGroup) %>%
+  summarise(MeanKelp = mean(Total_Canopy_Forming, na.rm = TRUE)) %>%
+  left_join(df_leters, by = "YearGroup") %>%
+  ggplot(aes(x = YearGroup, y = MeanKelp)) +
+  geom_col(fill = "olivedrab4", alpha = 0.7) +
+  geom_text(aes(label = round(MeanKelp, 1)), vjust = -0.5) +
+  geom_text(
+    aes(
+      y = MeanKelp + 4,   # place letters slightly above the bar
+      label = Letters
+    ),
+    size = 6
+  ) +
+  labs(
+    x = "5 Year Group",
+    y = "Mean Kelp Canopy Percent Cover per 0.25m²"
+  ) +
+  theme_minimal()
+
+ggsave(filename = "Figures/CommunitySurveys/allsites_year_kelp.png", 
+       plot = mean_kelp_yeargr , width = 8, height = 6, dpi = 300)
+
+# quick anova 
+kelp_aov <- aov(Total_Canopy_Forming ~ YearGroup, data = df)
+summary(kelp_aov)
+
+kelptuk <- TukeyHSD(kelp_aov)
+
+# Extract p-values for Year Group comparisons
+kelp_p <-kelptuk$YearGroup[, "p adj"]
+
+# Convert to compact letter display
+letters <- multcompLetters(kelp_p)
+letters$Letters
+
+df_leters <- data.frame(
+  YearGroup = names(letters$Letters),
+  Letters = letters$Letters
+)
+
+############ KELP BY YEAR
+
 mean_kelp <- df %>%
   group_by(Year) %>%
   summarise(MeanKelp = mean(Total_Canopy_Forming, na.rm = TRUE)) %>%
   ggplot(aes(x = Year, y = MeanKelp)) +
   geom_col(fill = "olivedrab4", alpha = 0.7) +
-  geom_hline(yintercept = 22, linetype = "dotted", color = "black", size = 1) +
+  geom_hline(yintercept = 32, linetype = "dotted", color = "black", size = 1) +
   geom_text(aes(label = round(MeanKelp, 1)), vjust = -0.5) +
   labs(
-    title = "Mean Kelp Canopy Percent Cover at all Sites",
     x = "Year",
     y = "Mean Kelp Canopy Percent Cover per 0.25m²"
   ) +

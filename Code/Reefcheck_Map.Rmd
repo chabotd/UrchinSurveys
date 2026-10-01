@@ -1,0 +1,124 @@
+---
+title: "UrchinSurveyMap"
+author: "Delaney Chabot"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+
+knitr::opts_knit$set(root.dir = rstudioapi::getActiveProject())
+
+
+```
+
+Load packages
+```{r}
+library(ggplot2)
+#library(ggsn)
+library(maps)
+library(mapdata)
+library(ggrepel)
+library(readxl)
+library(tidyverse)
+library(ggspatial)
+```
+
+**URCHIN MAPS**
+Import Data
+```{r}
+
+SiteList <- read.csv("Data/Reefcheck_Transects_2024.csv")
+
+long <- SiteList$SubSiteLongitude
+lat <- SiteList$SubSiteLatitude
+Site <-SiteList$Site
+Reg <-SiteList$Area
+#Reg<-factor(Reg, levels=c('Cape Foulweather','Cape Perpetua','Cape Arago','Cape Blanco', 'Southern Oregon'))
+
+SiteCode <-SiteList$SiteCode
+```
+
+Make base map
+```{r}
+states <- map_data("state")
+#states <- states %>% #include for only Oregon and California
+#  subset(region %in% c("california", "oregon"))
+```
+
+Site Map and Suseptibilty map
+```{r}
+#map it
+SiteLabels <- SiteList %>%
+  distinct(Site, .keep_all = TRUE)
+
+map <-ggplot(data = SiteList, 
+             aes(x=long, 
+                 y = lat)) +   
+ geom_text_repel(
+   data=SiteLabels,
+  aes(x = long, y = lat, label = Site),
+  nudge_x = -100, 
+  min.segment.length = 0, 
+  seed = 42, 
+  box.padding = 0.5,
+  size = 5
+) +
+  geom_polygon(data = states, color = "black", fill = "gray90", aes(group=group)) + 
+  geom_point(size = 3, shape = 16) +
+  coord_fixed(1.3) +
+  theme_classic()+
+  labs(x="Longitude", y = "Latitude") +
+  scale_x_continuous(breaks = seq(-126,-116,2)) +
+  scale_y_continuous(breaks = seq(31,47,1)) +
+  coord_map(xlim = c(-127,-115), ylim = c(39,48))
+  theme(
+  axis.title.x = element_text(size = 14),
+  axis.title.y = element_text(size = 14),
+  axis.text.x = element_text(size = 12),
+  axis.text.y = element_text(size = 12)
+)
+  
+
+plot(map)
+
+ggsave(filename = "Figures/SurveyInitialMap.png", 
+       plot = map , width = 8, height = 6, dpi = 300)
+```
+```{r}
+map <-ggplot(data = SiteList, 
+             aes(x=long, 
+                 y = lat, color = Susceptibility)) +   
+ geom_text_repel(
+  aes(x = long, y = lat, label = SiteCode, color = Susceptibility),
+  direction = "y", 
+  nudge_x = -125, 
+  min.segment.length = 0, 
+  seed = 42, 
+  box.padding = 0.5,
+  size = 5
+) +
+  geom_polygon(data = states, color = "black", fill = "gray90", aes(group=group)) + 
+  geom_point(size = 3, shape = 16) +
+  scale_color_manual(values= c("#577590","#90be6d","#f8961e", "#f94144", "#555599")) +
+  coord_fixed(1.3) +
+  theme_classic()+
+  labs(x="Longitude", y = "Latitude") +
+  scale_x_continuous(breaks = seq(-126,-116,2)) +
+  scale_y_continuous(breaks = seq(31,47,1)) +
+  coord_map(xlim = c(-126,-116), ylim = c(40,47))+
+  theme(
+  axis.title.x = element_text(size = 14),
+  axis.title.y = element_text(size = 14),
+  axis.text.x = element_text(size = 12),
+  axis.text.y = element_text(size = 12)
+)
+  
+
+plot(map)
+ggsave(filename = "Figures/SuseptibilityMap.png", 
+       plot = map , width = 8, height = 6, dpi = 300)
+```
+
+
+
